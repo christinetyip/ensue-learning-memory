@@ -59,6 +59,17 @@ Key concepts learned:
 - [concept 2]: [one-line summary]
 - [concept 3]: [one-line summary]
 
+How they connect:
++-------------+       +-------------+       +-------------+
+| [concept 1] |------>| [concept 2] |------>| [concept 3] |
++-------------+       +-------------+       +-------------+
+        \                                         /
+         \------> [key insight connecting them] <-/
+
+Visual diagrams to review:
+- public/concepts/[topic]/visual-[name]
+- public/concepts/[topic]/visual-[name]
+
 Recall performance:
 - [concept]: [strong/weak/needed help]
 
@@ -69,6 +80,29 @@ Hooks for next session:
 New entries saved:
 - public/concepts/computing/xyz
 - public/toolbox/devtools/abc
+```
+
+### Creating the "How they connect" diagram
+
+Create a simple ASCII diagram showing:
+1. Main concepts as boxes
+2. Arrows showing relationships
+3. Key insight that ties them together
+
+Example:
+```
+How they connect:
+
+[Phone/App]              [Gateway :18789]              [Claude API]
+     |                         |                            |
+     |   Tailscale VPN         |      HTTPS :443            |
+     v                         v                            v
++---------+  finds laptop  +----------+  sends request  +--------+
+| Client  |--------------->| Gateway  |---------------->| Server |
+| (UI)    |                | (routes) |                 | (work) |
++---------+                +----------+                 +--------+
+
+Key insight: VPN solves FINDING, Gateway solves ROUTING, Server does WORK
 ```
 
 ### Step 6: Offer to Save Concepts
