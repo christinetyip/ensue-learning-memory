@@ -35,7 +35,7 @@ export ENSUE_API_KEY="your-key-here"
 
 In Claude Code:
 ```
-/plugin add github:YOUR_USERNAME/ensue-learning-memory
+/plugin add github:christinetyip/ensue-learning-memory
 ```
 
 Or clone locally and:
