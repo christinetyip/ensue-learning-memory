@@ -20,9 +20,16 @@ This is NOT a generic note-taking system. It's a learning companion.
 
 ## Installation
 
-### 1. Get an Ensue API Key
+### 1. Choose Your API Key
 
-Go to https://www.ensue-network.ai/dashboard and create a free account.
+**Option A: Create your own knowledge base**
+Get your own API key at https://www.ensue-network.ai/dashboard (you get one for free after logging in).
+
+**Option B: Browse Christine's knowledge base (read-only)**
+Use this guest key to explore an existing knowledge base with computing/networking concepts:
+```
+lmn_ccc3096db3584a2b9d356384c0bfbe24
+```
 
 ### 2. Set the Environment Variable
 
