@@ -22,21 +22,31 @@ Before any read: *What context might enrich this conversation?*
 
 ## Namespace Structure
 
-Two main namespaces with clear purposes:
+Two top-level namespaces with different visibility:
 
 ```
-concepts/             --> Understanding how things work (shareable)
-  computing/          --> Software, programs, architecture
-  networking/         --> Networks, protocols, connectivity
-  [new-topic]/        --> Add new domains as you learn
+public/                       --> Shareable with others
+  concepts/                   --> Understanding how things work
+    computing/                --> Software, programs, architecture
+    networking/               --> Networks, protocols, connectivity
+    learning/                 --> Meta-learning and retention techniques
+    [new-topic]/              --> Add new domains as you learn
+  toolbox/                    --> Tools you've personally used
+    _index                    --> Index of all tools
+    networking/               --> VPNs, tunnels, connectivity tools
+    ai-agents/                --> AI assistants and tools
+    devtools/                 --> Development utilities
 
-toolbox/              --> Tools you've personally used and understand
-  _index              --> Always maintain an index of all tools
-  networking/         --> VPNs, tunnels, connectivity tools
-  ai-agents/          --> AI assistants and tools
-  devtools/           --> Development utilities
-  [category]/         --> Add categories as needed
+private/                      --> Only visible to you (not shared)
+  sessions/                   --> Learning session logs
+    _latest                   --> Most recent session summary
+    YYYY-MM-DD                --> Session logs by date
+  notes/                      --> Personal notes, scratchpad
 ```
+
+**Rule:**
+- Save concepts and toolbox entries to `public/` (shareable)
+- Save session logs and personal notes to `private/` (only you can read)
 
 ## Content Standards
 
@@ -171,24 +181,24 @@ Use the wrapper script for all API calls:
 
 **List keys in a namespace:**
 ```bash
-./scripts/ensue-api.sh list_keys '{"prefix": "concepts/", "limit": 10}'
+./scripts/ensue-api.sh list_keys '{"prefix": "public/concepts/", "limit": 10}'
 ```
 
 **Get specific entries:**
 ```bash
-./scripts/ensue-api.sh get_memory '{"key_names": ["concepts/computing/what-is-a-server"]}'
+./scripts/ensue-api.sh get_memory '{"key_names": ["public/concepts/computing/what-is-a-server"]}'
 ```
 
 **Create entries (batch):**
 ```bash
 ./scripts/ensue-api.sh create_memory '{"items":[
-  {"key_name":"concepts/topic/name","description":"Short desc","value":"Full content","embed":true}
+  {"key_name":"public/concepts/topic/name","description":"Short desc","value":"Full content","embed":true}
 ]}'
 ```
 
 **Update an entry:**
 ```bash
-./scripts/ensue-api.sh update_memory '{"key_name": "toolbox/_index", "value": "New content"}'
+./scripts/ensue-api.sh update_memory '{"key_name": "public/toolbox/_index", "value": "New content"}'
 ```
 
 **Search semantically:**
@@ -198,14 +208,14 @@ Use the wrapper script for all API calls:
 
 ## Maintaining the Toolbox Index
 
-Always keep `toolbox/_index` updated when adding new tools:
+Always keep `public/toolbox/_index` updated when adding new tools:
 
 ```
 TOOLBOX - Personal Software Reference
 =====================================
 
 Current categories:
-toolbox/
+public/toolbox/
   _index              --> This file
   networking/         --> VPNs, tunnels, connectivity
   ai-agents/          --> AI assistants and tools
@@ -223,14 +233,15 @@ Rule: Only add tools after actually using them.
 
 | User says | Action |
 |-----------|--------|
-| "save this", "remember this" | Ask what specifically, draft entry, confirm, save |
-| "what do I know about X" | Search concepts/ and toolbox/, show relevant entries |
-| "add to toolbox", "save this tool" | Confirm they used it, create toolbox entry |
-| "list my concepts", "what have I learned" | list_keys with prefix concepts/ |
-| "show my toolbox", "what tools do I have" | list_keys with prefix toolbox/ |
+| "save this", "remember this" | Ask what specifically, draft entry, confirm, save to public/ |
+| "what do I know about X" | Search public/concepts/ and public/toolbox/, show relevant entries |
+| "add to toolbox", "save this tool" | Confirm they used it, create entry in public/toolbox/ |
+| "list my concepts", "what have I learned" | list_keys with prefix public/concepts/ |
+| "show my toolbox", "what tools do I have" | list_keys with prefix public/toolbox/ |
 | "show me [specific concept]" | get_memory for that key |
 | "update [entry]" | Get current, show proposed change, update |
 | "delete [entry]" | Show what will be deleted, confirm, delete |
+| "/learning-end", "end session" | Trigger learning-end skill for retrieval practice |
 
 ## Quality Checklist
 

@@ -53,16 +53,44 @@ Or clone locally and:
 ## Namespace Structure
 
 ```
-concepts/             --> Understanding how things work
-  computing/          --> Software, programs, architecture
-  networking/         --> Networks, protocols, connectivity
+public/                   --> Shareable with others
+  concepts/               --> Understanding how things work
+    computing/            --> Software, programs, architecture
+    networking/           --> Networks, protocols, connectivity
+  toolbox/                --> Tools you've personally used
+    _index                --> Index of all your tools
+    networking/           --> VPNs, tunnels
+    ai-agents/            --> AI tools
+    devtools/             --> Development utilities
 
-toolbox/              --> Tools you've personally used
-  _index              --> Index of all your tools
-  networking/         --> VPNs, tunnels
-  ai-agents/          --> AI tools
-  devtools/           --> Development utilities
+private/                  --> Only visible to you
+  sessions/               --> Learning session logs
+    _latest               --> Most recent session summary
 ```
+
+**Visibility:** Set regex patterns in Ensue dashboard to control access. `public/*` can be shared, `private/*` is yours only.
+
+## Learning Session Features
+
+### Session Start (Automatic)
+
+When you start Claude Code, a hook automatically:
+1. Checks for your last learning session
+2. Asks 1-2 recall questions to strengthen retention
+3. Then proceeds with whatever you want to work on
+
+### Session End (Command)
+
+When you're done learning, run:
+```
+/learning-end
+```
+
+This triggers:
+1. Identifies key concepts from the session
+2. Quizzes you on each (retrieval practice)
+3. Saves session summary to `private/sessions/_latest`
+4. Offers to save new concepts to `public/concepts/`
 
 ## Usage Examples
 
@@ -71,10 +99,10 @@ toolbox/              --> Tools you've personally used
 After Claude explains something to you:
 
 ```
-You: "Want me to save this to Ensue?"
+Claude: "Want me to save this to Ensue?"
 Claude: Shows draft with diagrams, analogies, examples
 You: "Yes"
-Claude: Saves to concepts/computing/what-is-a-server
+Claude: Saves to public/concepts/computing/what-is-a-server
 ```
 
 ### Adding a Tool
@@ -84,16 +112,30 @@ After you actually use a new tool:
 ```
 You: "Add bun to my toolbox"
 Claude: Creates entry with your experience using it
+Claude: Saves to public/toolbox/devtools/bun
 ```
 
 ### Recalling Knowledge
 
 ```
 You: "What do I know about ports?"
-Claude: Retrieves concepts/networking/ports and shows it
+Claude: Retrieves public/concepts/networking/ports and shows it
 
 You: "Show my toolbox"
-Claude: Lists all tools you've saved
+Claude: Lists all tools in public/toolbox/
+```
+
+### Ending a Learning Session
+
+```
+You: /learning-end
+
+Claude: Let's wrap up with recall practice.
+        Q: What's the difference between thin and thick clients?
+
+You: Thin clients are mostly UI, thick clients do real work locally...
+
+Claude: Perfect! Session saved. See you next time.
 ```
 
 ## Content Style

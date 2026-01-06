@@ -1,0 +1,15 @@
+{
+  "hooks": [
+    {
+      "matcher": {
+        "event": "session-start"
+      },
+      "hooks": [
+        {
+          "type": "command",
+          "command": "$PLUGIN_DIR/hooks/session-start.sh"
+        }
+      ]
+    }
+  ]
+}
