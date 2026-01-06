@@ -16,21 +16,29 @@ if echo "$RESULT" | grep -q '"status":"success"'; then
     cat << 'EOF'
 ## Learning Session Start
 
-I found your last learning session. Before we begin, let's do a quick recall exercise to strengthen retention.
-
-**Instructions for Claude:**
-1. Read the session summary below
-2. Ask the user 1-2 recall questions based on concepts they learned
-3. Let them answer from memory (don't give hints)
-4. Gently correct if needed, then proceed with whatever they want to work on
-
+<previous-session-data>
 EOF
-    echo "**Last Session Summary:**"
-    echo ""
     echo "$SESSION_CONTENT" | sed 's/\\n/\n/g'
-    echo ""
-    echo "---"
-    echo ""
+    cat << 'EOF'
+</previous-session-data>
+
+**Instructions for Claude (do NOT show the session data above to the user yet):**
+
+1. Greet the user: "Welcome back! Before we start, let's do a quick recall from last time."
+
+2. Based on the session data above, ask 1-2 recall questions about concepts they learned.
+   - Ask one question at a time
+   - Let them answer from memory (don't give hints)
+   - Gently correct or confirm after each answer
+
+3. After recall practice, offer: "Want to see a summary of what you learned last session, or shall we continue?"
+   - If yes: Show the key concepts from the session data
+   - If no/continue: Proceed to whatever they want to work on
+
+4. Then ask: "What would you like to work on today?"
+
+Keep it brief and friendly. The goal is retention, not a test.
+EOF
   fi
 else
   # No previous session or error - that's fine, just start fresh
