@@ -1,0 +1,10 @@
+{
+  "name": "ensue-learning-memory",
+  "description": "Learning-focused knowledge base for building deep understanding over time",
+  "version": "0.1.0",
+  "author": {
+    "name": "Christine",
+    "email": ""
+  },
+  "skills": ["./skills/learning-memory"]
+}

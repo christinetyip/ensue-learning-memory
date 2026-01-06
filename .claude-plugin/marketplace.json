@@ -1,0 +1,21 @@
+{
+  "name": "ensue-learning-memory",
+  "description": "A learning-focused knowledge base built on Ensue. For non-technical builders who want to deeply understand what they learn, not just store facts. Features structured concepts with diagrams, personal toolboxes, and mental models.",
+  "owner": {
+    "name": "Christine",
+    "email": ""
+  },
+  "metadata": {
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "ensue-learning-memory",
+      "description": "Learning-focused memory layer. Builds understanding with concepts, diagrams, and personal toolboxes. Triggers on learning discussions, 'save this', 'what do I know about', 'add to toolbox', 'show my concepts'.",
+      "source": "./",
+      "strict": false,
+      "category": "productivity",
+      "homepage": "https://ensue.dev"
+    }
+  ]
+}

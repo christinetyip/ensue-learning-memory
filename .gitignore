@@ -1,0 +1,10 @@
+# API key file (for local use)
+.ensue-key
+
+# OS files
+.DS_Store
+
+# Editor files
+*.swp
+*.swo
+*~
