@@ -3,16 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Knowledge Tree</title>
+    <title>Knowledge Base</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            background: #05051a;
             min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Animated gradient background */
+        .bg-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(ellipse at 20% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(6, 182, 212, 0.05) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
         }
 
         .container {
@@ -20,37 +37,85 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
+            position: relative;
+            z-index: 1;
         }
 
         header {
-            padding: 20px 40px;
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 16px 32px;
             background: rgba(255, 255, 255, 0.03);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 20px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            flex-shrink: 0;
+            gap: 40px;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
 
         h1 {
             color: #fff;
-            font-size: 1.5rem;
+            font-size: 1.1rem;
             font-weight: 600;
+            letter-spacing: -0.02em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h1 span {
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .stats {
             display: flex;
-            gap: 30px;
+            gap: 28px;
         }
 
         .stat { text-align: center; }
-        .stat-value { font-size: 1.5rem; font-weight: 700; color: #4ade80; }
-        .stat-label { font-size: 0.7rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #34d399, #22d3ee);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-label {
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-top: 2px;
+        }
 
         #tree-container {
             flex: 1;
             overflow: auto;
-            padding: 40px;
+            padding: 120px 60px 60px 60px;
+        }
+
+        #tree-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        #tree-container::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.02);
+        }
+        #tree-container::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+        #tree-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.15);
         }
 
         .branch { margin-left: 0; }
@@ -58,131 +123,250 @@
         .node-row {
             display: flex;
             align-items: center;
-            padding: 6px 12px;
-            border-radius: 8px;
+            padding: 8px 14px;
+            border-radius: 12px;
             cursor: pointer;
-            transition: background 0.2s;
-            gap: 10px;
+            transition: all 0.2s ease;
+            gap: 12px;
+            margin: 2px 0;
         }
 
-        .node-row:hover { background: rgba(255,255,255,0.05); }
-        .node-row.leaf:hover { background: rgba(74, 222, 128, 0.1); }
+        .node-row:hover {
+            background: rgba(255,255,255,0.04);
+        }
+        .node-row.leaf:hover {
+            background: rgba(52, 211, 153, 0.08);
+            box-shadow: 0 0 20px rgba(52, 211, 153, 0.1);
+        }
 
         .node-icon {
-            width: 28px; height: 28px; border-radius: 6px;
+            width: 32px; height: 32px; border-radius: 10px;
             display: flex; align-items: center; justify-content: center;
             font-size: 14px; flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: all 0.2s ease;
         }
 
-        .node-icon.root { background: linear-gradient(135deg, #8b5cf6, #a78bfa); }
-        .node-icon.category { background: linear-gradient(135deg, #3b82f6, #60a5fa); }
-        .node-icon.subcategory { background: linear-gradient(135deg, #06b6d4, #22d3ee); }
-        .node-icon.concept { background: linear-gradient(135deg, #10b981, #34d399); }
-        .node-icon.tool { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
-        .node-icon.diagram { background: linear-gradient(135deg, #ec4899, #f472b6); }
+        .node-row:hover .node-icon {
+            transform: scale(1.05);
+        }
 
-        .node-label { font-size: 14px; color: #fff; font-weight: 500; }
-        .node-description { font-size: 12px; color: rgba(255,255,255,0.4); margin-left: 8px; }
-        .node-count { font-size: 11px; color: rgba(255,255,255,0.3); margin-left: auto; padding-right: 10px; }
+        .node-icon.root { background: linear-gradient(135deg, #818cf8, #c084fc); box-shadow: 0 4px 20px rgba(129, 140, 248, 0.3); }
+        .node-icon.category { background: linear-gradient(135deg, #818cf8, #a78bfa); box-shadow: 0 4px 20px rgba(129, 140, 248, 0.25); }
+        .node-icon.subcategory { background: linear-gradient(135deg, #06b6d4, #22d3ee); box-shadow: 0 4px 20px rgba(6, 182, 212, 0.25); }
+        .node-icon.concept { background: linear-gradient(135deg, #10b981, #34d399); box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25); }
+        .node-icon.tool { background: linear-gradient(135deg, #f59e0b, #fbbf24); box-shadow: 0 4px 20px rgba(245, 158, 11, 0.25); }
+        .node-icon.diagram { background: linear-gradient(135deg, #ec4899, #f472b6); box-shadow: 0 4px 20px rgba(236, 72, 153, 0.25); }
+
+        .node-label { font-size: 14px; color: rgba(255,255,255,0.9); font-weight: 500; letter-spacing: -0.01em; }
+        .node-description { font-size: 12px; color: rgba(255,255,255,0.35); margin-left: 8px; font-weight: 400; }
+        .node-count {
+            font-size: 10px;
+            color: rgba(255,255,255,0.3);
+            margin-left: auto;
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.04);
+            border-radius: 20px;
+        }
 
         .children {
-            margin-left: 38px;
-            border-left: 2px solid rgba(255,255,255,0.1);
-            padding-left: 20px;
+            margin-left: 44px;
+            border-left: 1px solid rgba(255,255,255,0.06);
+            padding-left: 24px;
         }
 
         .toggle {
-            width: 18px; height: 18px; border-radius: 4px;
-            background: rgba(255,255,255,0.1);
+            width: 20px; height: 20px; border-radius: 6px;
+            background: rgba(255,255,255,0.06);
             display: flex; align-items: center; justify-content: center;
-            font-size: 10px; color: rgba(255,255,255,0.6);
-            flex-shrink: 0; transition: all 0.2s;
+            font-size: 9px; color: rgba(255,255,255,0.4);
+            flex-shrink: 0; transition: all 0.2s ease;
         }
-        .toggle:hover { background: rgba(255,255,255,0.2); }
+        .toggle:hover { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7); }
         .toggle.expanded { transform: rotate(90deg); }
         .leaf .toggle { visibility: hidden; }
 
-        .level-0 .node-label { font-size: 20px; font-weight: 700; }
-        .level-1 .node-label { font-size: 16px; font-weight: 600; }
-        .level-2 .node-label { font-size: 15px; font-weight: 600; }
-        .level-3 .node-label { font-size: 14px; font-weight: 400; }
+        .level-0 > .node-row .node-label { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+        .level-1 > .node-row .node-label { font-size: 17px; font-weight: 600; }
+        .level-2 > .node-row .node-label { font-size: 15px; font-weight: 600; }
+        .level-3 > .node-row .node-label { font-size: 14px; font-weight: 500; }
 
-        .level-0 .node-icon { width: 36px; height: 36px; font-size: 18px; }
-        .level-1 .node-icon { width: 32px; height: 32px; font-size: 16px; }
+        .level-0 > .node-row .node-icon { width: 40px; height: 40px; font-size: 20px; }
+        .level-1 > .node-row .node-icon { width: 36px; height: 36px; font-size: 17px; }
 
-        .level-1 > .children { margin-left: 44px; }
-        .level-2 > .children { margin-left: 40px; }
+        .level-1 > .children { margin-left: 50px; }
+        .level-2 > .children { margin-left: 46px; }
 
         .legend {
-            position: fixed; top: 80px; right: 20px;
-            background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
-            border-radius: 12px; padding: 16px;
-            display: flex; flex-direction: column; gap: 10px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .legend-title { font-size: 11px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-        .legend-item { display: flex; align-items: center; gap: 10px; color: rgba(255,255,255,0.8); font-size: 12px; }
-        .legend-color { width: 16px; height: 16px; border-radius: 4px; }
-
-        .controls { position: fixed; bottom: 20px; right: 20px; display: flex; gap: 10px; }
-        .control-btn {
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-            color: #fff; padding: 10px 16px; border-radius: 8px;
-            cursor: pointer; font-size: 13px; transition: all 0.2s;
-        }
-        .control-btn:hover { background: rgba(255,255,255,0.2); }
-
-        .search-box { position: fixed; top: 80px; left: 40px; }
-        .search-box input {
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-            color: #fff; padding: 10px 16px; border-radius: 8px;
-            font-size: 14px; width: 250px; outline: none;
-        }
-        .search-box input::placeholder { color: rgba(255,255,255,0.4); }
-        .search-box input:focus { border-color: rgba(255,255,255,0.4); }
-
-        .highlight { background: rgba(251, 191, 36, 0.3); border-radius: 3px; }
-        .hidden { display: none !important; }
-
-        .generated-info {
-            position: fixed; bottom: 20px; left: 20px;
-            font-size: 11px; color: rgba(255,255,255,0.3);
-        }
-        .generated-info a { color: rgba(255,255,255,0.5); }
-
-        /* Modal styles */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(8px);
-            display: none; align-items: center; justify-content: center;
-            z-index: 1000;
-            padding: 40px;
-        }
-        .modal-overlay.visible { display: flex; }
-
-        .modal {
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            border: 1px solid rgba(255,255,255,0.1);
+            position: fixed;
+            bottom: 28px;
+            left: 28px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             border-radius: 16px;
-            max-width: 800px;
-            width: 100%;
-            max-height: 80vh;
+            padding: 20px 24px;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 25px 80px rgba(0,0,0,0.5);
+            gap: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
         }
-
-        .modal-header {
-            padding: 20px 24px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+        .legend-title {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+        .legend-item {
             display: flex;
             align-items: center;
             gap: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 12px;
+            font-weight: 400;
+        }
+        .legend-color {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            display: flex;
+            gap: 12px;
+            z-index: 100;
+        }
+        .control-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.7);
+            padding: 12px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
+        .search-box {
+            position: fixed;
+            top: 100px;
+            left: 28px;
+            z-index: 100;
+        }
+        .search-box input {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #fff;
+            padding: 14px 20px;
+            border-radius: 14px;
+            font-size: 13px;
+            font-family: inherit;
+            width: 260px;
+            outline: none;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            transition: all 0.2s ease;
+        }
+        .search-box input::placeholder { color: rgba(255, 255, 255, 0.3); }
+        .search-box input:focus {
+            border-color: rgba(129, 140, 248, 0.5);
+            box-shadow: 0 0 20px rgba(129, 140, 248, 0.15);
+        }
+
+        .highlight {
+            background: rgba(251, 191, 36, 0.25);
+            border-radius: 4px;
+            padding: 0 2px;
+        }
+        .hidden { display: none !important; }
+
+        .generated-info {
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.25);
+            z-index: 100;
+            font-weight: 400;
+        }
+        .generated-info a {
+            color: rgba(255, 255, 255, 0.4);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .generated-info a:hover { color: rgba(255, 255, 255, 0.7); }
+
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(5, 5, 26, 0.9);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            padding: 40px;
+        }
+        .modal-overlay.visible {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+        }
+
+        .modal {
+            background: rgba(15, 15, 35, 0.98);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            max-width: 700px;
+            max-height: 80vh;
+            width: 100%;
+            overflow: hidden;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(99, 102, 241, 0.15);
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-overlay.visible .modal {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            padding: 24px 28px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
 
         .modal-header .node-icon {
-            width: 36px; height: 36px; font-size: 18px;
+            width: 44px; height: 44px; font-size: 22px;
+            border-radius: 12px;
         }
 
         .modal-title {
@@ -190,35 +374,43 @@
         }
 
         .modal-title h2 {
-            color: #fff;
             font-size: 1.2rem;
             font-weight: 600;
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0;
         }
 
         .modal-title .modal-path {
-            font-size: 12px;
-            color: rgba(255,255,255,0.4);
-            margin-top: 4px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.3);
+            margin-top: 6px;
             font-family: 'JetBrains Mono', monospace;
         }
 
         .modal-close {
-            background: rgba(255,255,255,0.1);
-            border: none;
-            color: rgba(255,255,255,0.6);
-            width: 32px; height: 32px;
-            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.6);
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
             cursor: pointer;
             font-size: 18px;
-            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
         }
         .modal-close:hover {
-            background: rgba(255,255,255,0.2);
+            background: rgba(255, 255, 255, 0.1);
             color: #fff;
         }
 
         .modal-content {
-            padding: 24px;
+            padding: 28px;
             overflow-y: auto;
             flex: 1;
         }
@@ -227,30 +419,34 @@
             font-family: 'JetBrains Mono', monospace;
             font-size: 13px;
             line-height: 1.7;
-            color: rgba(255,255,255,0.85);
+            color: rgba(255, 255, 255, 0.85);
             white-space: pre-wrap;
             word-wrap: break-word;
+            margin: 0;
         }
 
         .modal-description {
-            background: rgba(74, 222, 128, 0.1);
-            border-left: 3px solid #4ade80;
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            border-radius: 0 8px 8px 0;
-            color: rgba(255,255,255,0.8);
+            background: rgba(52, 211, 153, 0.08);
+            border-left: 3px solid #34d399;
+            padding: 14px 18px;
+            margin-bottom: 24px;
+            border-radius: 0 12px 12px 0;
+            color: rgba(255, 255, 255, 0.75);
             font-size: 14px;
+            line-height: 1.5;
         }
     </style>
 </head>
 <body>
+    <div class="bg-gradient"></div>
+
     <div class="container">
         <header>
-            <h1>🌳 Knowledge Tree</h1>
+            <h1><span>Knowledge Base</span></h1>
             <div class="stats">
                 <div class="stat">
                     <div class="stat-value">46</div>
-                    <div class="stat-label">Total</div>
+                    <div class="stat-label">Entries</div>
                 </div>
                 <div class="stat">
                     <div class="stat-value">34</div>
@@ -264,22 +460,19 @@
         </header>
 
         <div class="search-box">
-            <input type="text" id="search" placeholder="Search..." oninput="searchTree(this.value)">
+            <input type="text" id="search" placeholder="Search nodes..." oninput="searchTree(this.value)">
         </div>
 
         <div id="tree-container"></div>
     </div>
 
     <div class="legend">
-        <div class="legend-title">Legend</div>
-        <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #3b82f6, #60a5fa);"></div><span>Category</span></div>
-        <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #06b6d4, #22d3ee);"></div><span>Subcategory</span></div>
-        <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #10b981, #34d399);"></div><span>Concept</span></div>
-        <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #f59e0b, #fbbf24);"></div><span>Tool</span></div>
-        <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #ec4899, #f472b6);"></div><span>Diagram</span></div>
-        <div class="legend-item" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
-            <span style="color: rgba(255,255,255,0.5);">Click entry to view content</span>
-        </div>
+        <div class="legend-title">Node Types</div>
+        <div class="legend-item"><div class="legend-color" style="background: #818cf8; color: #818cf8;"></div><span>Category</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #22d3ee; color: #22d3ee;"></div><span>Subcategory</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #34d399; color: #34d399;"></div><span>Concept</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #fbbf24; color: #fbbf24;"></div><span>Tool</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #f472b6; color: #f472b6;"></div><span>Diagram</span></div>
     </div>
 
     <div class="controls">
