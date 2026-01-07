@@ -6,7 +6,7 @@ A learning-focused knowledge base plugin for Claude Code, built on [Ensue Memory
 
 ## Who This Is For
 
-Non-technical builders (vibecoding, no-code, learning to code) who want to:
+Developers who are using Claude Code and want to:
 - **Deeply understand** what they learn, not just store facts
 - **Build mental models** that compound over time
 - **Remember** concepts when they forget (and share with others)
