@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Graph</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            overflow: hidden;
+        }
+
+        #graph {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 16px 32px;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        h1 {
+            color: #fff;
+            font-size: 1.3rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 24px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #4ade80;
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 14px 18px;
+            color: #fff;
+            font-size: 13px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            max-width: 320px;
+            z-index: 200;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+        }
+
+        .tooltip h3 {
+            margin-bottom: 6px;
+            font-size: 15px;
+            color: #4ade80;
+        }
+
+        .tooltip .type {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .tooltip p {
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.5;
+        }
+
+        .legend {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 100;
+        }
+
+        .legend-title {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .search-box {
+            position: fixed;
+            top: 80px;
+            left: 20px;
+            z-index: 100;
+        }
+
+        .search-box input {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 12px 18px;
+            border-radius: 10px;
+            font-size: 14px;
+            width: 280px;
+            outline: none;
+            backdrop-filter: blur(10px);
+        }
+
+        .search-box input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .search-box input:focus {
+            border-color: #4ade80;
+        }
+
+        .generated-info {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.3);
+            z-index: 100;
+        }
+
+        .generated-info a {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .node-label {
+            font-size: 11px;
+            fill: #fff;
+            pointer-events: none;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);
+            font-weight: 500;
+        }
+
+        .node-label.category {
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .node-label.subcategory {
+            font-size: 12px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🕸️ Knowledge Graph</h1>
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value">42</div>
+                <div class="stat-label">Entries</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">31</div>
+                <div class="stat-label">Concepts</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">5</div>
+                <div class="stat-label">Tools</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="search-box">
+        <input type="text" id="search" placeholder="Search nodes..." oninput="searchNodes(this.value)">
+    </div>
+
+    <div id="graph"></div>
+    <div class="tooltip" id="tooltip"></div>
+
+    <div class="legend">
+        <div class="legend-title">Node Types</div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #3b82f6;"></div>
+            <span>Category</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #10b981;"></div>
+            <span>Concept</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #f59e0b;"></div>
+            <span>Tool</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #ec4899;"></div>
+            <span>Diagram</span>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="control-btn" onclick="resetView()">Reset View</button>
+        <button class="control-btn" onclick="toggleLabels()">Toggle Labels</button>
+    </div>
+
+    <div class="generated-info">
+        Generated from <a href="https://ensue-network.ai">Ensue</a> • 1/7/2026
+    </div>
+
+    <script>
+        const graphData = {"nodes":[{"id":"concepts","name":"concepts","type":"category","color":"#3b82f6","size":40},{"id":"toolbox","name":"toolbox","type":"category","color":"#f59e0b","size":40},{"id":"concepts/computing","name":"computing","type":"subcategory","color":"#10b981","size":30},{"id":"concepts/networking","name":"networking","type":"subcategory","color":"#8b5cf6","size":30},{"id":"toolbox/networking","name":"networking","type":"subcategory","color":"#8b5cf6","size":30},{"id":"toolbox/ai-agents","name":"ai-agents","type":"subcategory","color":"#ec4899","size":30},{"id":"toolbox/knowledge","name":"knowledge","type":"subcategory","color":"#84cc16","size":30},{"id":"toolbox/devtools","name":"devtools","type":"subcategory","color":"#06b6d4","size":30},{"id":"public/concepts/computing/e2ee-trust-model","name":"e2ee-trust-model","fullName":"public/concepts/computing/e2ee-trust-model","description":"How we can verify that E2EE services like Signal don't have our keys","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/tls-vs-e2ee","name":"tls-vs-e2ee","fullName":"public/concepts/computing/tls-vs-e2ee","description":"Difference between TLS (transport encryption) and end-to-end encryption","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/legacy-vs-greenfield","name":"legacy-vs-greenfield","fullName":"public/concepts/computing/legacy-vs-greenfield","description":"Why new software built from scratch is often more efficient than legacy software","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/networking/laptop-must-stay-on","name":"laptop-must-stay-on","fullName":"public/concepts/networking/laptop-must-stay-on","description":"Why the host machine must remain powered on for self-hosted agents","type":"concept","color":"#8b5cf6","size":20},{"id":"public/concepts/networking/vpn","name":"vpn","fullName":"public/concepts/networking/vpn","description":"What is a VPN and why it is needed","type":"concept","color":"#8b5cf6","size":20},{"id":"public/concepts/networking/private-ip-problem","name":"private-ip-problem","fullName":"public/concepts/networking/private-ip-problem","description":"Why devices are unreachable outside home network","type":"concept","color":"#8b5cf6","size":20},{"id":"public/concepts/networking/ports","name":"ports","fullName":"public/concepts/networking/ports","description":"What are ports and why they are needed","type":"concept","color":"#8b5cf6","size":20},{"id":"public/concepts/networking/gateway","name":"gateway","fullName":"public/concepts/networking/gateway","description":"What is a gateway and the gateway pattern","type":"concept","color":"#8b5cf6","size":20},{"id":"public/concepts/computing/common-services-overview","name":"common-services-overview","fullName":"public/concepts/computing/common-services-overview","description":"Overview of common network services and their ports","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/why-remote-storage","name":"why-remote-storage","fullName":"public/concepts/computing/why-remote-storage","description":"Why most apps store data remotely instead of locally on your device","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/networking/multiple-agents-multiple-ports","name":"multiple-agents-multiple-ports","fullName":"public/concepts/networking/multiple-agents-multiple-ports","description":"How multiple agents would each have their own gateway and port","type":"concept","color":"#8b5cf6","size":20},{"id":"public/concepts/computing/client-server-architecture","name":"client-server-architecture","fullName":"public/concepts/computing/client-server-architecture","description":"How apps and browsers are just UI clients to servers","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/networking/visual-gateway-pattern","name":"visual-gateway-pattern","fullName":"public/concepts/networking/visual-gateway-pattern","description":"Visual diagram comparing messy vs clean gateway pattern","type":"diagram","color":"#ec4899","size":20},{"id":"public/concepts/networking/visual-architecture-diagram","name":"visual-architecture-diagram","fullName":"public/concepts/networking/visual-architecture-diagram","description":"Visual diagram of self-hosted AI assistant architecture","type":"diagram","color":"#ec4899","size":20},{"id":"public/concepts/networking/self-hosted-agent-architecture","name":"self-hosted-agent-architecture","fullName":"public/concepts/networking/self-hosted-agent-architecture","description":"How VPN, gateway, and agent work together for a self-hosted AI assistant","type":"concept","color":"#8b5cf6","size":20},{"id":"public/concepts/computing/ports-listening-vs-connecting","name":"ports-listening-vs-connecting","fullName":"public/concepts/computing/ports-listening-vs-connecting","description":"Understanding when ports are used - servers listen, clients connect","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/networking/visual-ports-analogy","name":"visual-ports-analogy","fullName":"public/concepts/networking/visual-ports-analogy","description":"Visual analogy explaining IP addresses and ports","type":"diagram","color":"#ec4899","size":20},{"id":"public/concepts/computing/what-is-a-server","name":"what-is-a-server","fullName":"public/concepts/computing/what-is-a-server","description":"Definition of a server - it is a role, not special hardware","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/ssh-explained","name":"ssh-explained","fullName":"public/concepts/computing/ssh-explained","description":"What SSH is and when you would use it","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/redis-explained","name":"redis-explained","fullName":"public/concepts/computing/redis-explained","description":"What Redis is - server-side cache for speed","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/how-browsers-find-websites","name":"how-browsers-find-websites","fullName":"public/concepts/computing/how-browsers-find-websites","description":"DNS lookup and how browsers connect to web servers","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/visual-client-server-diagram","name":"visual-client-server-diagram","fullName":"public/concepts/computing/visual-client-server-diagram","description":"Visual diagram showing apps as UI clients to servers","type":"diagram","color":"#ec4899","size":20},{"id":"public/concepts/computing/databases-explained","name":"databases-explained","fullName":"public/concepts/computing/databases-explained","description":"What databases are and where data is stored","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/visual-ports-listening","name":"visual-ports-listening","fullName":"public/concepts/computing/visual-ports-listening","description":"Visual diagram showing when ports are listening vs not","type":"diagram","color":"#ec4899","size":20},{"id":"public/concepts/computing/dev-server-explained","name":"dev-server-explained","fullName":"public/concepts/computing/dev-server-explained","description":"What a dev server is - local development environment","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/rendering-gpu-vs-cpu","name":"rendering-gpu-vs-cpu","fullName":"public/concepts/computing/rendering-gpu-vs-cpu","description":"What renders web pages and apps - GPU vs CPU roles","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/what-is-streaming","name":"what-is-streaming","fullName":"public/concepts/computing/what-is-streaming","description":"What streaming means - receiving data continuously in real-time","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/mental-model-summary","name":"mental-model-summary","fullName":"public/concepts/computing/mental-model-summary","description":"Big picture mental model tying client-server concepts together","type":"concept","color":"#10b981","size":20},{"id":"public/toolbox/networking/tailscale","name":"tailscale","fullName":"public/toolbox/networking/tailscale","description":"VPN tool for connecting devices from anywhere","type":"tool","color":"#f59e0b","size":20},{"id":"public/concepts/computing/frontend-vs-backend","name":"frontend-vs-backend","fullName":"public/concepts/computing/frontend-vs-backend","description":"What is front-end vs back-end and what languages are used","type":"concept","color":"#10b981","size":20},{"id":"public/toolbox/ai-agents/claude-code","name":"claude-code","fullName":"public/toolbox/ai-agents/claude-code","description":"AI coding assistant in terminal","type":"tool","color":"#f59e0b","size":20},{"id":"public/toolbox/ai-agents/clawdbot","name":"clawdbot","fullName":"public/toolbox/ai-agents/clawdbot","description":"Self-hosted AI assistant via messaging apps","type":"tool","color":"#f59e0b","size":20},{"id":"public/concepts/computing/https-beyond-browsers","name":"https-beyond-browsers","fullName":"public/concepts/computing/https-beyond-browsers","description":"HTTPS is used for more than just websites","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/nodejs-runtime","name":"nodejs-runtime","fullName":"public/concepts/computing/nodejs-runtime","description":"What Node.js is - a runtime that executes JavaScript","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/bundlers","name":"bundlers","fullName":"public/concepts/computing/bundlers","description":"What bundlers (webpack) do - combine files for production","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/thin-vs-thick-client","name":"thin-vs-thick-client","fullName":"public/concepts/computing/thin-vs-thick-client","description":"Difference between thin clients (mostly UI) and thick clients (local processing)","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/package-managers","name":"package-managers","fullName":"public/concepts/computing/package-managers","description":"What package managers (npm, bun) are and why they exist","type":"concept","color":"#10b981","size":20},{"id":"public/toolbox/knowledge/ensue","name":"ensue","fullName":"public/toolbox/knowledge/ensue","description":"Persistent knowledge base for augmented cognition across conversations","type":"tool","color":"#f59e0b","size":20},{"id":"public/concepts/computing/disk-vs-ram","name":"disk-vs-ram","fullName":"public/concepts/computing/disk-vs-ram","description":"Difference between disk storage and RAM memory","type":"concept","color":"#10b981","size":20},{"id":"public/concepts/computing/npm-registry","name":"npm-registry","fullName":"public/concepts/computing/npm-registry","description":"What the npm registry is and who maintains it","type":"concept","color":"#10b981","size":20},{"id":"public/toolbox/devtools/bun","name":"bun","fullName":"public/toolbox/devtools/bun","description":"Fast JavaScript runtime and package manager - used for Clawdbot","type":"tool","color":"#f59e0b","size":20},{"id":"public/concepts/computing/visual-bun-install-process","name":"visual-bun-install-process","fullName":"public/concepts/computing/visual-bun-install-process","description":"Visual diagram of what happens when you run bun install","type":"diagram","color":"#ec4899","size":20}],"links":[{"source":"concepts","target":"concepts/computing","strength":0.8},{"source":"concepts","target":"concepts/networking","strength":0.8},{"source":"toolbox","target":"toolbox/networking","strength":0.8},{"source":"toolbox","target":"toolbox/ai-agents","strength":0.8},{"source":"toolbox","target":"toolbox/knowledge","strength":0.8},{"source":"toolbox","target":"toolbox/devtools","strength":0.8},{"source":"concepts/computing","target":"public/concepts/computing/e2ee-trust-model","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/tls-vs-e2ee","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/legacy-vs-greenfield","strength":0.5},{"source":"concepts/networking","target":"public/concepts/networking/laptop-must-stay-on","strength":0.5},{"source":"concepts/networking","target":"public/concepts/networking/vpn","strength":0.5},{"source":"concepts/networking","target":"public/concepts/networking/private-ip-problem","strength":0.5},{"source":"concepts/networking","target":"public/concepts/networking/ports","strength":0.5},{"source":"concepts/networking","target":"public/concepts/networking/gateway","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/common-services-overview","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/why-remote-storage","strength":0.5},{"source":"concepts/networking","target":"public/concepts/networking/multiple-agents-multiple-ports","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/client-server-architecture","strength":0.5},{"source":"concepts/networking","target":"public/concepts/networking/visual-gateway-pattern","strength":0.5},{"source":"concepts/networking","target":"public/concepts/networking/visual-architecture-diagram","strength":0.5},{"source":"concepts/networking","target":"public/concepts/networking/self-hosted-agent-architecture","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/ports-listening-vs-connecting","strength":0.5},{"source":"concepts/networking","target":"public/concepts/networking/visual-ports-analogy","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/what-is-a-server","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/ssh-explained","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/redis-explained","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/how-browsers-find-websites","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/visual-client-server-diagram","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/databases-explained","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/visual-ports-listening","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/dev-server-explained","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/rendering-gpu-vs-cpu","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/what-is-streaming","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/mental-model-summary","strength":0.5},{"source":"toolbox/networking","target":"public/toolbox/networking/tailscale","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/frontend-vs-backend","strength":0.5},{"source":"toolbox/ai-agents","target":"public/toolbox/ai-agents/claude-code","strength":0.5},{"source":"toolbox/ai-agents","target":"public/toolbox/ai-agents/clawdbot","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/https-beyond-browsers","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/nodejs-runtime","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/bundlers","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/thin-vs-thick-client","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/package-managers","strength":0.5},{"source":"toolbox/knowledge","target":"public/toolbox/knowledge/ensue","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/disk-vs-ram","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/npm-registry","strength":0.5},{"source":"toolbox/devtools","target":"public/toolbox/devtools/bun","strength":0.5},{"source":"concepts/computing","target":"public/concepts/computing/visual-bun-install-process","strength":0.5},{"source":"public/concepts/computing/tls-vs-e2ee","target":"public/concepts/computing/thin-vs-thick-client","strength":0.1,"type":"related"},{"source":"public/concepts/computing/tls-vs-e2ee","target":"public/concepts/computing/disk-vs-ram","strength":0.1,"type":"related"},{"source":"public/concepts/computing/legacy-vs-greenfield","target":"public/concepts/computing/https-beyond-browsers","strength":0.1,"type":"related"},{"source":"public/concepts/networking/laptop-must-stay-on","target":"public/concepts/networking/visual-architecture-diagram","strength":0.1,"type":"related"},{"source":"public/concepts/networking/laptop-must-stay-on","target":"public/concepts/networking/self-hosted-agent-architecture","strength":0.1,"type":"related"},{"source":"public/concepts/networking/laptop-must-stay-on","target":"public/toolbox/ai-agents/clawdbot","strength":0.1,"type":"related"},{"source":"public/concepts/networking/vpn","target":"public/concepts/networking/ports","strength":0.1,"type":"related"},{"source":"public/concepts/networking/ports","target":"public/concepts/computing/package-managers","strength":0.1,"type":"related"},{"source":"public/concepts/networking/gateway","target":"public/concepts/networking/visual-gateway-pattern","strength":0.1,"type":"related"},{"source":"public/concepts/computing/common-services-overview","target":"public/concepts/networking/multiple-agents-multiple-ports","strength":0.1,"type":"related"},{"source":"public/concepts/computing/client-server-architecture","target":"public/concepts/computing/ports-listening-vs-connecting","strength":0.1,"type":"related"},{"source":"public/concepts/computing/client-server-architecture","target":"public/concepts/computing/how-browsers-find-websites","strength":0.1,"type":"related"},{"source":"public/concepts/computing/client-server-architecture","target":"public/concepts/computing/visual-client-server-diagram","strength":0.1,"type":"related"},{"source":"public/concepts/computing/client-server-architecture","target":"public/concepts/computing/mental-model-summary","strength":0.1,"type":"related"},{"source":"public/concepts/computing/client-server-architecture","target":"public/concepts/computing/https-beyond-browsers","strength":0.1,"type":"related"},{"source":"public/concepts/computing/client-server-architecture","target":"public/concepts/computing/thin-vs-thick-client","strength":0.1,"type":"related"},{"source":"public/concepts/networking/visual-gateway-pattern","target":"public/concepts/networking/visual-architecture-diagram","strength":0.1,"type":"related"},{"source":"public/concepts/networking/visual-gateway-pattern","target":"public/concepts/computing/visual-client-server-diagram","strength":0.1,"type":"related"},{"source":"public/concepts/networking/visual-gateway-pattern","target":"public/concepts/computing/visual-ports-listening","strength":0.1,"type":"related"},{"source":"public/concepts/networking/visual-gateway-pattern","target":"public/concepts/computing/visual-bun-install-process","strength":0.1,"type":"related"},{"source":"public/concepts/networking/visual-architecture-diagram","target":"public/concepts/networking/self-hosted-agent-architecture","strength":0.1,"type":"related"},{"source":"public/concepts/networking/visual-architecture-diagram","target":"public/concepts/computing/visual-client-server-diagram","strength":0.1,"type":"related"},{"source":"public/concepts/networking/visual-architecture-diagram","target":"public/concepts/computing/visual-ports-listening","strength":0.1,"type":"related"},{"source":"public/concepts/networking/visual-architecture-diagram","target":"public/toolbox/ai-agents/clawdbot","strength":0.1,"type":"related"},{"source":"public/concepts/networking/visual-architecture-diagram","target":"public/concepts/computing/visual-bun-install-process","strength":0.1,"type":"related"},{"source":"public/concepts/networking/self-hosted-agent-architecture","target":"public/toolbox/ai-agents/clawdbot","strength":0.1,"type":"related"},{"source":"public/concepts/computing/ports-listening-vs-connecting","target":"public/concepts/computing/how-browsers-find-websites","strength":0.1,"type":"related"},{"source":"public/concepts/computing/ports-listening-vs-connecting","target":"public/concepts/computing/visual-client-server-diagram","strength":0.1,"type":"related"},{"source":"public/concepts/computing/ports-listening-vs-connecting","target":"public/concepts/computing/visual-ports-listening","strength":0.1,"type":"related"},{"source":"public/concepts/networking/visual-ports-analogy","target":"public/concepts/computing/visual-ports-listening","strength":0.1,"type":"related"},{"source":"public/concepts/computing/what-is-a-server","target":"public/concepts/computing/redis-explained","strength":0.1,"type":"related"},{"source":"public/concepts/computing/what-is-a-server","target":"public/concepts/computing/dev-server-explained","strength":0.1,"type":"related"},{"source":"public/concepts/computing/ssh-explained","target":"public/concepts/computing/redis-explained","strength":0.1,"type":"related"},{"source":"public/concepts/computing/ssh-explained","target":"public/concepts/computing/databases-explained","strength":0.1,"type":"related"},{"source":"public/concepts/computing/ssh-explained","target":"public/concepts/computing/dev-server-explained","strength":0.1,"type":"related"},{"source":"public/concepts/computing/ssh-explained","target":"public/concepts/computing/visual-bun-install-process","strength":0.1,"type":"related"},{"source":"public/concepts/computing/redis-explained","target":"public/concepts/computing/databases-explained","strength":0.1,"type":"related"},{"source":"public/concepts/computing/redis-explained","target":"public/concepts/computing/dev-server-explained","strength":0.1,"type":"related"},{"source":"public/concepts/computing/how-browsers-find-websites","target":"public/concepts/computing/https-beyond-browsers","strength":0.1,"type":"related"},{"source":"public/concepts/computing/visual-client-server-diagram","target":"public/concepts/computing/visual-ports-listening","strength":0.1,"type":"related"},{"source":"public/concepts/computing/visual-client-server-diagram","target":"public/concepts/computing/mental-model-summary","strength":0.1,"type":"related"},{"source":"public/concepts/computing/visual-client-server-diagram","target":"public/concepts/computing/thin-vs-thick-client","strength":0.1,"type":"related"},{"source":"public/concepts/computing/visual-client-server-diagram","target":"public/concepts/computing/visual-bun-install-process","strength":0.1,"type":"related"},{"source":"public/concepts/computing/databases-explained","target":"public/concepts/computing/dev-server-explained","strength":0.1,"type":"related"},{"source":"public/concepts/computing/databases-explained","target":"public/concepts/computing/what-is-streaming","strength":0.1,"type":"related"},{"source":"public/concepts/computing/visual-ports-listening","target":"public/concepts/computing/visual-bun-install-process","strength":0.1,"type":"related"},{"source":"public/concepts/computing/nodejs-runtime","target":"public/toolbox/devtools/bun","strength":0.1,"type":"related"},{"source":"public/concepts/computing/thin-vs-thick-client","target":"public/concepts/computing/disk-vs-ram","strength":0.1,"type":"related"}]};
+
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        let showLabels = true;
+
+        const svg = d3.select('#graph')
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height);
+
+        // Add zoom behavior
+        const g = svg.append('g');
+
+        const zoom = d3.zoom()
+            .scaleExtent([0.2, 4])
+            .on('zoom', (event) => {
+                g.attr('transform', event.transform);
+            });
+
+        svg.call(zoom);
+
+        // Initial zoom to fit
+        svg.call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2).scale(0.8));
+
+        // Create force simulation
+        const simulation = d3.forceSimulation(graphData.nodes)
+            .force('link', d3.forceLink(graphData.links)
+                .id(d => d.id)
+                .distance(d => d.type === 'related' ? 150 : 80)
+                .strength(d => d.strength || 0.5))
+            .force('charge', d3.forceManyBody()
+                .strength(d => d.type === 'category' ? -400 : d.type === 'subcategory' ? -200 : -100))
+            .force('center', d3.forceCenter(0, 0))
+            .force('collision', d3.forceCollide().radius(d => d.size + 30));
+
+        // Draw links
+        const link = g.append('g')
+            .selectAll('line')
+            .data(graphData.links)
+            .join('line')
+            .attr('stroke', d => d.type === 'related' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.15)')
+            .attr('stroke-width', d => d.type === 'related' ? 1 : 1.5);
+
+        // Draw nodes
+        const node = g.append('g')
+            .selectAll('g')
+            .data(graphData.nodes)
+            .join('g')
+            .attr('class', 'node')
+            .call(d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended));
+
+        // Node circles
+        node.append('circle')
+            .attr('r', d => d.size)
+            .attr('fill', d => d.color)
+            .attr('stroke', '#fff')
+            .attr('stroke-width', d => d.type === 'category' ? 3 : d.type === 'subcategory' ? 2 : 1)
+            .attr('stroke-opacity', 0.3)
+            .style('cursor', 'pointer')
+            .on('mouseover', showTooltip)
+            .on('mouseout', hideTooltip)
+            .on('click', focusNode);
+
+        // Node labels
+        const labels = node.append('text')
+            .attr('class', d => 'node-label ' + d.type)
+            .attr('dy', d => d.size + 14)
+            .attr('text-anchor', 'middle')
+            .text(d => {
+                const name = d.name;
+                return name.length > 20 ? name.substring(0, 18) + '...' : name;
+            });
+
+        // Simulation tick
+        simulation.on('tick', () => {
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+
+        // Drag functions
+        function dragstarted(event) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            event.subject.fx = event.subject.x;
+            event.subject.fy = event.subject.y;
+        }
+
+        function dragged(event) {
+            event.subject.fx = event.x;
+            event.subject.fy = event.y;
+        }
+
+        function dragended(event) {
+            if (!event.active) simulation.alphaTarget(0);
+            event.subject.fx = null;
+            event.subject.fy = null;
+        }
+
+        // Tooltip
+        function showTooltip(event, d) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.innerHTML = `
+                <h3>${d.name}</h3>
+                <div class="type">${d.type}</div>
+                ${d.description ? '<p>' + d.description + '</p>' : ''}
+            `;
+            tooltip.style.left = (event.pageX + 15) + 'px';
+            tooltip.style.top = (event.pageY - 10) + 'px';
+            tooltip.classList.add('visible');
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').classList.remove('visible');
+        }
+
+        // Focus on node
+        function focusNode(event, d) {
+            const scale = 1.5;
+            svg.transition()
+                .duration(500)
+                .call(zoom.transform, d3.zoomIdentity
+                    .translate(width / 2 - d.x * scale, height / 2 - d.y * scale)
+                    .scale(scale));
+        }
+
+        // Reset view
+        function resetView() {
+            svg.transition()
+                .duration(500)
+                .call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2).scale(0.8));
+        }
+
+        // Toggle labels
+        function toggleLabels() {
+            showLabels = !showLabels;
+            labels.style('opacity', showLabels ? 1 : 0);
+        }
+
+        // Search
+        function searchNodes(query) {
+            const q = query.toLowerCase().trim();
+
+            node.select('circle')
+                .attr('opacity', d => {
+                    if (!q) return 1;
+                    const match = d.name.toLowerCase().includes(q) ||
+                                  (d.description && d.description.toLowerCase().includes(q));
+                    return match ? 1 : 0.1;
+                });
+
+            labels.attr('opacity', d => {
+                if (!showLabels) return 0;
+                if (!q) return 1;
+                const match = d.name.toLowerCase().includes(q) ||
+                              (d.description && d.description.toLowerCase().includes(q));
+                return match ? 1 : 0.1;
+            });
+
+            link.attr('opacity', d => {
+                if (!q) return 1;
+                const sourceMatch = d.source.name.toLowerCase().includes(q);
+                const targetMatch = d.target.name.toLowerCase().includes(q);
+                return (sourceMatch || targetMatch) ? 0.5 : 0.05;
+            });
+        }
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            svg.attr('width', window.innerWidth).attr('height', window.innerHeight);
+        });
+    </script>
+</body>
+</html>

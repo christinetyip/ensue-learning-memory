@@ -3,12 +3,10 @@
  * Generate Knowledge Tree Visualization
  *
  * Fetches your knowledge base from Ensue and generates an interactive HTML visualization.
+ * Click any entry to see its full content.
  *
  * Usage:
  *   ENSUE_API_KEY=your-key bun run scripts/generate-tree.js
- *
- * Or if you have .ensue-key file:
- *   bun run scripts/generate-tree.js
  */
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
@@ -18,7 +16,6 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(__dirname, '..');
 
-// Get API key from env or file
 function getApiKey() {
     if (process.env.ENSUE_API_KEY) {
         return process.env.ENSUE_API_KEY;
@@ -28,12 +25,9 @@ function getApiKey() {
         return readFileSync(keyFile, 'utf-8').trim();
     }
     console.error('Error: ENSUE_API_KEY not set.');
-    console.error('Either set the environment variable or create a .ensue-key file.');
-    console.error('Get your key at: https://www.ensue-network.ai/dashboard');
     process.exit(1);
 }
 
-// Call Ensue API
 async function ensueApi(method, args = {}) {
     const apiKey = getApiKey();
     const response = await fetch('https://api.ensue-network.ai/', {
@@ -50,7 +44,6 @@ async function ensueApi(method, args = {}) {
         }),
     });
 
-    // Get response text and handle potential "data: " prefix (SSE format)
     let text = await response.text();
     if (text.startsWith('data: ')) {
         text = text.replace(/^data: /, '');
@@ -63,15 +56,41 @@ async function ensueApi(method, args = {}) {
     return data.result?.structuredContent;
 }
 
-// Fetch all keys from Ensue
 async function fetchAllKeys() {
     console.log('Fetching keys from Ensue...');
     const result = await ensueApi('list_keys', { prefix: 'public/', limit: 500 });
     return result?.keys || [];
 }
 
-// Build tree structure from flat key list
-function buildTree(keys) {
+async function fetchAllContent(keys) {
+    console.log('Fetching content for all entries...');
+    const keyNames = keys.map(k => k.key_name).filter(k => !k.endsWith('/_index'));
+
+    // Fetch in batches of 10
+    const batchSize = 10;
+    const contents = {};
+
+    for (let i = 0; i < keyNames.length; i += batchSize) {
+        const batch = keyNames.slice(i, i + batchSize);
+        const result = await ensueApi('get_memory', { key_names: batch });
+
+        if (result?.results) {
+            for (const item of result.results) {
+                if (item.value) {
+                    contents[item.key_name] = item.value;
+                }
+            }
+        }
+
+        // Progress indicator
+        process.stdout.write(`\r  Fetched ${Math.min(i + batchSize, keyNames.length)}/${keyNames.length} entries`);
+    }
+    console.log('');
+
+    return contents;
+}
+
+function buildTree(keys, contents) {
     const tree = {
         name: 'Knowledge Tree',
         type: 'root',
@@ -79,18 +98,15 @@ function buildTree(keys) {
         children: []
     };
 
-    // Group keys by path
     const groups = {};
 
     for (const key of keys) {
         const parts = key.key_name.replace('public/', '').split('/');
-
-        // Skip _index files
         if (parts[parts.length - 1] === '_index') continue;
 
-        const category = parts[0]; // concepts or toolbox
-        const subcategory = parts[1]; // computing, networking, ai-agents, etc.
-        const name = parts.slice(2).join('/'); // the actual entry name
+        const category = parts[0];
+        const subcategory = parts[1];
+        const name = parts.slice(2).join('/');
 
         if (!name) continue;
 
@@ -99,27 +115,18 @@ function buildTree(keys) {
 
         groups[category][subcategory].push({
             name,
+            key: key.key_name,
             description: key.description || '',
+            content: contents[key.key_name] || '',
             type: category === 'toolbox' ? 'tool' :
                   name.startsWith('visual-') ? 'diagram' : 'concept',
         });
     }
 
-    // Build tree structure
-    const categoryIcons = {
-        concepts: '💡',
-        toolbox: '🧰',
-    };
-
+    const categoryIcons = { concepts: '💡', toolbox: '🧰' };
     const subcategoryIcons = {
-        computing: '💻',
-        networking: '🌐',
-        'ai-agents': '🤖',
-        devtools: '🛠️',
-        knowledge: '📚',
-        security: '🔒',
-        databases: '🗄️',
-        learning: '📖',
+        computing: '💻', networking: '🌐', 'ai-agents': '🤖',
+        devtools: '🛠️', knowledge: '📚', security: '🔒', databases: '🗄️', learning: '📖',
     };
 
     for (const [category, subcategories] of Object.entries(groups)) {
@@ -140,12 +147,10 @@ function buildTree(keys) {
             categoryNode.children.push(subcategoryNode);
         }
 
-        // Sort subcategories
         categoryNode.children.sort((a, b) => a.name.localeCompare(b.name));
         tree.children.push(categoryNode);
     }
 
-    // Sort categories (concepts first, then toolbox)
     tree.children.sort((a, b) => {
         if (a.name === 'concepts') return -1;
         if (b.name === 'concepts') return 1;
@@ -155,13 +160,6 @@ function buildTree(keys) {
     return tree;
 }
 
-// Count total entries
-function countEntries(node) {
-    if (!node.children) return 1;
-    return node.children.reduce((sum, child) => sum + countEntries(child), 0);
-}
-
-// Count by type
 function countByType(node, type) {
     let count = 0;
     if (node.type === type) count = 1;
@@ -171,7 +169,6 @@ function countByType(node, type) {
     return count;
 }
 
-// Generate HTML
 function generateHtml(tree) {
     const totalConcepts = countByType(tree, 'concept');
     const totalTools = countByType(tree, 'tool');
@@ -184,15 +181,13 @@ function generateHtml(tree) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Knowledge Tree</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
             min-height: 100vh;
         }
@@ -218,9 +213,6 @@ function generateHtml(tree) {
             color: #fff;
             font-size: 1.5rem;
             font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 12px;
         }
 
         .stats {
@@ -228,22 +220,9 @@ function generateHtml(tree) {
             gap: 30px;
         }
 
-        .stat {
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #4ade80;
-        }
-
-        .stat-label {
-            font-size: 0.7rem;
-            color: rgba(255, 255, 255, 0.5);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
+        .stat { text-align: center; }
+        .stat-value { font-size: 1.5rem; font-weight: 700; color: #4ade80; }
+        .stat-label { font-size: 0.7rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; }
 
         #tree-container {
             flex: 1;
@@ -251,15 +230,7 @@ function generateHtml(tree) {
             padding: 40px;
         }
 
-        .tree {
-            display: flex;
-            flex-direction: column;
-            gap: 0;
-        }
-
-        .branch {
-            margin-left: 0;
-        }
+        .branch { margin-left: 0; }
 
         .node-row {
             display: flex;
@@ -271,19 +242,13 @@ function generateHtml(tree) {
             gap: 10px;
         }
 
-        .node-row:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
+        .node-row:hover { background: rgba(255,255,255,0.05); }
+        .node-row.leaf:hover { background: rgba(74, 222, 128, 0.1); }
 
         .node-icon {
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            flex-shrink: 0;
+            width: 28px; height: 28px; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; flex-shrink: 0;
         }
 
         .node-icon.root { background: linear-gradient(135deg, #8b5cf6, #a78bfa); }
@@ -293,56 +258,26 @@ function generateHtml(tree) {
         .node-icon.tool { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
         .node-icon.diagram { background: linear-gradient(135deg, #ec4899, #f472b6); }
 
-        .node-label {
-            font-size: 14px;
-            color: #fff;
-            font-weight: 500;
-        }
-
-        .node-description {
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.4);
-            margin-left: 8px;
-        }
-
-        .node-count {
-            font-size: 11px;
-            color: rgba(255, 255, 255, 0.3);
-            margin-left: auto;
-            padding-right: 10px;
-        }
+        .node-label { font-size: 14px; color: #fff; font-weight: 500; }
+        .node-description { font-size: 12px; color: rgba(255,255,255,0.4); margin-left: 8px; }
+        .node-count { font-size: 11px; color: rgba(255,255,255,0.3); margin-left: auto; padding-right: 10px; }
 
         .children {
             margin-left: 38px;
-            border-left: 2px solid rgba(255, 255, 255, 0.1);
+            border-left: 2px solid rgba(255,255,255,0.1);
             padding-left: 20px;
         }
 
         .toggle {
-            width: 18px;
-            height: 18px;
-            border-radius: 4px;
-            background: rgba(255, 255, 255, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            color: rgba(255, 255, 255, 0.6);
-            flex-shrink: 0;
-            transition: all 0.2s;
+            width: 18px; height: 18px; border-radius: 4px;
+            background: rgba(255,255,255,0.1);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; color: rgba(255,255,255,0.6);
+            flex-shrink: 0; transition: all 0.2s;
         }
-
-        .toggle:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        .toggle.expanded {
-            transform: rotate(90deg);
-        }
-
-        .leaf .toggle {
-            visibility: hidden;
-        }
+        .toggle:hover { background: rgba(255,255,255,0.2); }
+        .toggle.expanded { transform: rotate(90deg); }
+        .leaf .toggle { visibility: hidden; }
 
         .level-0 .node-label { font-size: 20px; font-weight: 700; }
         .level-1 .node-label { font-size: 16px; font-weight: 600; }
@@ -351,116 +286,137 @@ function generateHtml(tree) {
 
         .level-0 .node-icon { width: 36px; height: 36px; font-size: 18px; }
         .level-1 .node-icon { width: 32px; height: 32px; font-size: 16px; }
-        .level-2 .node-icon { width: 28px; height: 28px; font-size: 14px; }
 
         .level-1 > .children { margin-left: 44px; }
         .level-2 > .children { margin-left: 40px; }
 
         .legend {
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: fixed; top: 80px; right: 20px;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
+            border-radius: 12px; padding: 16px;
+            display: flex; flex-direction: column; gap: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
         }
+        .legend-title { font-size: 11px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+        .legend-item { display: flex; align-items: center; gap: 10px; color: rgba(255,255,255,0.8); font-size: 12px; }
+        .legend-color { width: 16px; height: 16px; border-radius: 4px; }
 
-        .legend-title {
-            font-size: 11px;
-            color: rgba(255, 255, 255, 0.5);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 4px;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 12px;
-        }
-
-        .legend-color {
-            width: 16px;
-            height: 16px;
-            border-radius: 4px;
-        }
-
-        .controls {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            display: flex;
-            gap: 10px;
-        }
-
+        .controls { position: fixed; bottom: 20px; right: 20px; display: flex; gap: 10px; }
         .control-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #fff;
-            padding: 10px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 13px;
-            transition: all 0.2s;
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            color: #fff; padding: 10px 16px; border-radius: 8px;
+            cursor: pointer; font-size: 13px; transition: all 0.2s;
         }
+        .control-btn:hover { background: rgba(255,255,255,0.2); }
 
-        .control-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        .search-box {
-            position: fixed;
-            top: 80px;
-            left: 40px;
-            display: flex;
-            gap: 8px;
-        }
-
+        .search-box { position: fixed; top: 80px; left: 40px; }
         .search-box input {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #fff;
-            padding: 10px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            width: 250px;
-            outline: none;
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            color: #fff; padding: 10px 16px; border-radius: 8px;
+            font-size: 14px; width: 250px; outline: none;
         }
+        .search-box input::placeholder { color: rgba(255,255,255,0.4); }
+        .search-box input:focus { border-color: rgba(255,255,255,0.4); }
 
-        .search-box input::placeholder {
-            color: rgba(255, 255, 255, 0.4);
-        }
-
-        .search-box input:focus {
-            border-color: rgba(255, 255, 255, 0.4);
-        }
-
-        .highlight {
-            background: rgba(251, 191, 36, 0.3);
-            border-radius: 3px;
-        }
-
-        .hidden {
-            display: none !important;
-        }
+        .highlight { background: rgba(251, 191, 36, 0.3); border-radius: 3px; }
+        .hidden { display: none !important; }
 
         .generated-info {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            font-size: 11px;
-            color: rgba(255, 255, 255, 0.3);
+            position: fixed; bottom: 20px; left: 20px;
+            font-size: 11px; color: rgba(255,255,255,0.3);
+        }
+        .generated-info a { color: rgba(255,255,255,0.5); }
+
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            display: none; align-items: center; justify-content: center;
+            z-index: 1000;
+            padding: 40px;
+        }
+        .modal-overlay.visible { display: flex; }
+
+        .modal {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            max-width: 800px;
+            width: 100%;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.5);
         }
 
-        .generated-info a {
-            color: rgba(255, 255, 255, 0.5);
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .modal-header .node-icon {
+            width: 36px; height: 36px; font-size: 18px;
+        }
+
+        .modal-title {
+            flex: 1;
+        }
+
+        .modal-title h2 {
+            color: #fff;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .modal-title .modal-path {
+            font-size: 12px;
+            color: rgba(255,255,255,0.4);
+            margin-top: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .modal-close {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: rgba(255,255,255,0.6);
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.2s;
+        }
+        .modal-close:hover {
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+        }
+
+        .modal-content {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-content pre {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.7;
+            color: rgba(255,255,255,0.85);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .modal-description {
+            background: rgba(74, 222, 128, 0.1);
+            border-left: 3px solid #4ade80;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            border-radius: 0 8px 8px 0;
+            color: rgba(255,255,255,0.8);
+            font-size: 14px;
         }
     </style>
 </head>
@@ -493,25 +449,13 @@ function generateHtml(tree) {
 
     <div class="legend">
         <div class="legend-title">Legend</div>
-        <div class="legend-item">
-            <div class="legend-color" style="background: linear-gradient(135deg, #3b82f6, #60a5fa);"></div>
-            <span>Category</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background: linear-gradient(135deg, #06b6d4, #22d3ee);"></div>
-            <span>Subcategory</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background: linear-gradient(135deg, #10b981, #34d399);"></div>
-            <span>Concept</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background: linear-gradient(135deg, #f59e0b, #fbbf24);"></div>
-            <span>Tool</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background: linear-gradient(135deg, #ec4899, #f472b6);"></div>
-            <span>Diagram</span>
+        <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #3b82f6, #60a5fa);"></div><span>Category</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #06b6d4, #22d3ee);"></div><span>Subcategory</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #10b981, #34d399);"></div><span>Concept</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #f59e0b, #fbbf24);"></div><span>Tool</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #ec4899, #f472b6);"></div><span>Diagram</span></div>
+        <div class="legend-item" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
+            <span style="color: rgba(255,255,255,0.5);">Click entry to view content</span>
         </div>
     </div>
 
@@ -524,30 +468,74 @@ function generateHtml(tree) {
         Generated from <a href="https://ensue-network.ai">Ensue</a> • ${new Date().toLocaleDateString()}
     </div>
 
-    <script>
-        const data = ${JSON.stringify(tree, null, 2)};
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="node-icon" id="modal-icon"></div>
+                <div class="modal-title">
+                    <h2 id="modal-name"></h2>
+                    <div class="modal-path" id="modal-path"></div>
+                </div>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-content">
+                <div class="modal-description" id="modal-description"></div>
+                <pre id="modal-text"></pre>
+            </div>
+        </div>
+    </div>
 
-        const icons = {
-            concept: "📄",
-            tool: "🔧",
-            diagram: "📊"
-        };
+    <script>
+        const data = ${JSON.stringify(tree)};
+
+        const icons = { concept: "📄", tool: "🔧", diagram: "📊" };
 
         function countChildren(node) {
             if (!node.children) return 0;
             return node.children.reduce((sum, child) => sum + 1 + countChildren(child), 0);
         }
 
+        function showModal(node) {
+            const modal = document.getElementById('modal');
+            const iconEl = document.getElementById('modal-icon');
+            const nameEl = document.getElementById('modal-name');
+            const pathEl = document.getElementById('modal-path');
+            const descEl = document.getElementById('modal-description');
+            const textEl = document.getElementById('modal-text');
+
+            iconEl.className = 'node-icon ' + node.type;
+            iconEl.textContent = icons[node.type] || '📄';
+            nameEl.textContent = node.name;
+            pathEl.textContent = node.key || '';
+            descEl.textContent = node.description || '';
+            descEl.style.display = node.description ? 'block' : 'none';
+            textEl.textContent = node.content || 'No content available';
+
+            modal.classList.add('visible');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('modal').classList.remove('visible');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
         function createNode(node, level = 0) {
             const div = document.createElement('div');
-            div.className = \`branch level-\${level}\`;
+            div.className = 'branch level-' + level;
             div.dataset.name = node.name.toLowerCase();
 
             const hasChildren = node.children && node.children.length > 0;
             const isLeaf = !hasChildren;
 
             const row = document.createElement('div');
-            row.className = \`node-row \${isLeaf ? 'leaf' : ''}\`;
+            row.className = 'node-row' + (isLeaf ? ' leaf' : '');
 
             const toggle = document.createElement('div');
             toggle.className = 'toggle expanded';
@@ -565,7 +553,7 @@ function generateHtml(tree) {
             row.appendChild(toggle);
 
             const iconDiv = document.createElement('div');
-            iconDiv.className = \`node-icon \${node.type}\`;
+            iconDiv.className = 'node-icon ' + node.type;
             iconDiv.textContent = node.icon || icons[node.type] || '📄';
             row.appendChild(iconDiv);
 
@@ -577,15 +565,20 @@ function generateHtml(tree) {
             if (node.description && isLeaf) {
                 const desc = document.createElement('span');
                 desc.className = 'node-description';
-                desc.textContent = \`— \${node.description}\`;
+                desc.textContent = '— ' + node.description;
                 row.appendChild(desc);
             }
 
             if (hasChildren) {
                 const count = document.createElement('span');
                 count.className = 'node-count';
-                count.textContent = \`\${countChildren(node)} items\`;
+                count.textContent = countChildren(node) + ' items';
                 row.appendChild(count);
+            }
+
+            // Click handler for leaf nodes
+            if (isLeaf && node.content) {
+                row.onclick = () => showModal(node);
             }
 
             div.appendChild(row);
@@ -660,22 +653,23 @@ function generateHtml(tree) {
 </html>`;
 }
 
-// Main
 async function main() {
     try {
         const keys = await fetchAllKeys();
-        console.log(`Found ${keys.length} entries`);
+        console.log('Found ' + keys.length + ' entries');
 
-        const tree = buildTree(keys);
+        const contents = await fetchAllContent(keys);
+
+        const tree = buildTree(keys, contents);
         const html = generateHtml(tree);
 
         const outputPath = join(PLUGIN_ROOT, 'knowledge-base.html');
         writeFileSync(outputPath, html);
 
-        console.log(`✓ Generated: ${outputPath}`);
-        console.log(`  - ${countByType(tree, 'concept')} concepts`);
-        console.log(`  - ${countByType(tree, 'tool')} tools`);
-        console.log(`  - ${countByType(tree, 'diagram')} diagrams`);
+        console.log('✓ Generated: ' + outputPath);
+        console.log('  - ' + countByType(tree, 'concept') + ' concepts');
+        console.log('  - ' + countByType(tree, 'tool') + ' tools');
+        console.log('  - ' + countByType(tree, 'diagram') + ' diagrams');
     } catch (error) {
         console.error('Error:', error.message);
         process.exit(1);
