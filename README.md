@@ -166,6 +166,26 @@ Analogy: A restaurant kitchen. It waits for orders (requests) and
 serves food (responses).
 ```
 
+## Knowledge Tree Visualization
+
+Generate an interactive HTML visualization of your knowledge base:
+
+```bash
+# Make sure ENSUE_API_KEY is set, then run:
+bun run scripts/generate-tree.js
+
+# Opens knowledge-base.html in your browser
+open knowledge-base.html
+```
+
+Features:
+- Interactive tree view of all your concepts and tools
+- Search/filter functionality
+- Collapsible branches
+- Color-coded by type (concept, tool, diagram)
+
+Run this whenever you want to update your visualization after adding new knowledge.
+
 ## Contributing
 
 This plugin was created to match a specific learning style. Feel free to fork and customize for your own approach!

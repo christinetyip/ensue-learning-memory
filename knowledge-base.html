@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Tree</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 20px 40px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        h1 {
+            color: #fff;
+            font-size: 1.5rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 30px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #4ade80;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #tree-container {
+            flex: 1;
+            overflow: auto;
+            padding: 40px;
+        }
+
+        .tree {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .branch {
+            margin-left: 0;
+        }
+
+        .node-row {
+            display: flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            gap: 10px;
+        }
+
+        .node-row:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .node-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .node-icon.root { background: linear-gradient(135deg, #8b5cf6, #a78bfa); }
+        .node-icon.category { background: linear-gradient(135deg, #3b82f6, #60a5fa); }
+        .node-icon.subcategory { background: linear-gradient(135deg, #06b6d4, #22d3ee); }
+        .node-icon.concept { background: linear-gradient(135deg, #10b981, #34d399); }
+        .node-icon.tool { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+        .node-icon.diagram { background: linear-gradient(135deg, #ec4899, #f472b6); }
+
+        .node-label {
+            font-size: 14px;
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .node-description {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.4);
+            margin-left: 8px;
+        }
+
+        .node-count {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.3);
+            margin-left: auto;
+            padding-right: 10px;
+        }
+
+        .children {
+            margin-left: 38px;
+            border-left: 2px solid rgba(255, 255, 255, 0.1);
+            padding-left: 20px;
+        }
+
+        .toggle {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.6);
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        .toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .toggle.expanded {
+            transform: rotate(90deg);
+        }
+
+        .leaf .toggle {
+            visibility: hidden;
+        }
+
+        .level-0 .node-label { font-size: 20px; font-weight: 700; }
+        .level-1 .node-label { font-size: 16px; font-weight: 600; }
+        .level-2 .node-label { font-size: 15px; font-weight: 600; }
+        .level-3 .node-label { font-size: 14px; font-weight: 400; }
+
+        .level-0 .node-icon { width: 36px; height: 36px; font-size: 18px; }
+        .level-1 .node-icon { width: 32px; height: 32px; font-size: 16px; }
+        .level-2 .node-icon { width: 28px; height: 28px; font-size: 14px; }
+
+        .level-1 > .children { margin-left: 44px; }
+        .level-2 > .children { margin-left: 40px; }
+
+        .legend {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .legend-title {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .search-box {
+            position: fixed;
+            top: 80px;
+            left: 40px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .search-box input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            width: 250px;
+            outline: none;
+        }
+
+        .search-box input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .search-box input:focus {
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .highlight {
+            background: rgba(251, 191, 36, 0.3);
+            border-radius: 3px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .generated-info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .generated-info a {
+            color: rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌳 Knowledge Tree</h1>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value">42</div>
+                    <div class="stat-label">Total</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">31</div>
+                    <div class="stat-label">Concepts</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">5</div>
+                    <div class="stat-label">Tools</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="search-box">
+            <input type="text" id="search" placeholder="Search..." oninput="searchTree(this.value)">
+        </div>
+
+        <div id="tree-container"></div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-title">Legend</div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: linear-gradient(135deg, #3b82f6, #60a5fa);"></div>
+            <span>Category</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: linear-gradient(135deg, #06b6d4, #22d3ee);"></div>
+            <span>Subcategory</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: linear-gradient(135deg, #10b981, #34d399);"></div>
+            <span>Concept</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: linear-gradient(135deg, #f59e0b, #fbbf24);"></div>
+            <span>Tool</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: linear-gradient(135deg, #ec4899, #f472b6);"></div>
+            <span>Diagram</span>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="control-btn" onclick="expandAll()">Expand All</button>
+        <button class="control-btn" onclick="collapseAll()">Collapse All</button>
+    </div>
+
+    <div class="generated-info">
+        Generated from <a href="https://ensue-network.ai">Ensue</a> • 1/7/2026
+    </div>
+
+    <script>
+        const data = {
+  "name": "Knowledge Tree",
+  "type": "root",
+  "icon": "🌳",
+  "children": [
+    {
+      "name": "concepts",
+      "type": "category",
+      "icon": "💡",
+      "children": [
+        {
+          "name": "computing",
+          "type": "subcategory",
+          "icon": "💻",
+          "children": [
+            {
+              "name": "bundlers",
+              "description": "What bundlers (webpack) do - combine files for production",
+              "type": "concept"
+            },
+            {
+              "name": "client-server-architecture",
+              "description": "How apps and browsers are just UI clients to servers",
+              "type": "concept"
+            },
+            {
+              "name": "common-services-overview",
+              "description": "Overview of common network services and their ports",
+              "type": "concept"
+            },
+            {
+              "name": "databases-explained",
+              "description": "What databases are and where data is stored",
+              "type": "concept"
+            },
+            {
+              "name": "dev-server-explained",
+              "description": "What a dev server is - local development environment",
+              "type": "concept"
+            },
+            {
+              "name": "disk-vs-ram",
+              "description": "Difference between disk storage and RAM memory",
+              "type": "concept"
+            },
+            {
+              "name": "e2ee-trust-model",
+              "description": "How we can verify that E2EE services like Signal don't have our keys",
+              "type": "concept"
+            },
+            {
+              "name": "frontend-vs-backend",
+              "description": "What is front-end vs back-end and what languages are used",
+              "type": "concept"
+            },
+            {
+              "name": "how-browsers-find-websites",
+              "description": "DNS lookup and how browsers connect to web servers",
+              "type": "concept"
+            },
+            {
+              "name": "https-beyond-browsers",
+              "description": "HTTPS is used for more than just websites",
+              "type": "concept"
+            },
+            {
+              "name": "legacy-vs-greenfield",
+              "description": "Why new software built from scratch is often more efficient than legacy software",
+              "type": "concept"
+            },
+            {
+              "name": "mental-model-summary",
+              "description": "Big picture mental model tying client-server concepts together",
+              "type": "concept"
+            },
+            {
+              "name": "nodejs-runtime",
+              "description": "What Node.js is - a runtime that executes JavaScript",
+              "type": "concept"
+            },
+            {
+              "name": "npm-registry",
+              "description": "What the npm registry is and who maintains it",
+              "type": "concept"
+            },
+            {
+              "name": "package-managers",
+              "description": "What package managers (npm, bun) are and why they exist",
+              "type": "concept"
+            },
+            {
+              "name": "ports-listening-vs-connecting",
+              "description": "Understanding when ports are used - servers listen, clients connect",
+              "type": "concept"
+            },
+            {
+              "name": "redis-explained",
+              "description": "What Redis is - server-side cache for speed",
+              "type": "concept"
+            },
+            {
+              "name": "rendering-gpu-vs-cpu",
+              "description": "What renders web pages and apps - GPU vs CPU roles",
+              "type": "concept"
+            },
+            {
+              "name": "ssh-explained",
+              "description": "What SSH is and when you would use it",
+              "type": "concept"
+            },
+            {
+              "name": "thin-vs-thick-client",
+              "description": "Difference between thin clients (mostly UI) and thick clients (local processing)",
+              "type": "concept"
+            },
+            {
+              "name": "tls-vs-e2ee",
+              "description": "Difference between TLS (transport encryption) and end-to-end encryption",
+              "type": "concept"
+            },
+            {
+              "name": "visual-bun-install-process",
+              "description": "Visual diagram of what happens when you run bun install",
+              "type": "diagram"
+            },
+            {
+              "name": "visual-client-server-diagram",
+              "description": "Visual diagram showing apps as UI clients to servers",
+              "type": "diagram"
+            },
+            {
+              "name": "visual-ports-listening",
+              "description": "Visual diagram showing when ports are listening vs not",
+              "type": "diagram"
+            },
+            {
+              "name": "what-is-a-server",
+              "description": "Definition of a server - it is a role, not special hardware",
+              "type": "concept"
+            },
+            {
+              "name": "what-is-streaming",
+              "description": "What streaming means - receiving data continuously in real-time",
+              "type": "concept"
+            },
+            {
+              "name": "why-remote-storage",
+              "description": "Why most apps store data remotely instead of locally on your device",
+              "type": "concept"
+            }
+          ]
+        },
+        {
+          "name": "networking",
+          "type": "subcategory",
+          "icon": "🌐",
+          "children": [
+            {
+              "name": "gateway",
+              "description": "What is a gateway and the gateway pattern",
+              "type": "concept"
+            },
+            {
+              "name": "laptop-must-stay-on",
+              "description": "Why the host machine must remain powered on for self-hosted agents",
+              "type": "concept"
+            },
+            {
+              "name": "multiple-agents-multiple-ports",
+              "description": "How multiple agents would each have their own gateway and port",
+              "type": "concept"
+            },
+            {
+              "name": "ports",
+              "description": "What are ports and why they are needed",
+              "type": "concept"
+            },
+            {
+              "name": "private-ip-problem",
+              "description": "Why devices are unreachable outside home network",
+              "type": "concept"
+            },
+            {
+              "name": "self-hosted-agent-architecture",
+              "description": "How VPN, gateway, and agent work together for a self-hosted AI assistant",
+              "type": "concept"
+            },
+            {
+              "name": "visual-architecture-diagram",
+              "description": "Visual diagram of self-hosted AI assistant architecture",
+              "type": "diagram"
+            },
+            {
+              "name": "visual-gateway-pattern",
+              "description": "Visual diagram comparing messy vs clean gateway pattern",
+              "type": "diagram"
+            },
+            {
+              "name": "visual-ports-analogy",
+              "description": "Visual analogy explaining IP addresses and ports",
+              "type": "diagram"
+            },
+            {
+              "name": "vpn",
+              "description": "What is a VPN and why it is needed",
+              "type": "concept"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "toolbox",
+      "type": "category",
+      "icon": "🧰",
+      "children": [
+        {
+          "name": "ai-agents",
+          "type": "subcategory",
+          "icon": "🤖",
+          "children": [
+            {
+              "name": "claude-code",
+              "description": "AI coding assistant in terminal",
+              "type": "tool"
+            },
+            {
+              "name": "clawdbot",
+              "description": "Self-hosted AI assistant via messaging apps",
+              "type": "tool"
+            }
+          ]
+        },
+        {
+          "name": "devtools",
+          "type": "subcategory",
+          "icon": "🛠️",
+          "children": [
+            {
+              "name": "bun",
+              "description": "Fast JavaScript runtime and package manager - used for Clawdbot",
+              "type": "tool"
+            }
+          ]
+        },
+        {
+          "name": "knowledge",
+          "type": "subcategory",
+          "icon": "📚",
+          "children": [
+            {
+              "name": "ensue",
+              "description": "Persistent knowledge base for augmented cognition across conversations",
+              "type": "tool"
+            }
+          ]
+        },
+        {
+          "name": "networking",
+          "type": "subcategory",
+          "icon": "🌐",
+          "children": [
+            {
+              "name": "tailscale",
+              "description": "VPN tool for connecting devices from anywhere",
+              "type": "tool"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+};
+
+        const icons = {
+            concept: "📄",
+            tool: "🔧",
+            diagram: "📊"
+        };
+
+        function countChildren(node) {
+            if (!node.children) return 0;
+            return node.children.reduce((sum, child) => sum + 1 + countChildren(child), 0);
+        }
+
+        function createNode(node, level = 0) {
+            const div = document.createElement('div');
+            div.className = `branch level-${level}`;
+            div.dataset.name = node.name.toLowerCase();
+
+            const hasChildren = node.children && node.children.length > 0;
+            const isLeaf = !hasChildren;
+
+            const row = document.createElement('div');
+            row.className = `node-row ${isLeaf ? 'leaf' : ''}`;
+
+            const toggle = document.createElement('div');
+            toggle.className = 'toggle expanded';
+            toggle.innerHTML = '▶';
+            if (hasChildren) {
+                toggle.onclick = (e) => {
+                    e.stopPropagation();
+                    const children = div.querySelector('.children');
+                    if (children) {
+                        children.classList.toggle('hidden');
+                        toggle.classList.toggle('expanded');
+                    }
+                };
+            }
+            row.appendChild(toggle);
+
+            const iconDiv = document.createElement('div');
+            iconDiv.className = `node-icon ${node.type}`;
+            iconDiv.textContent = node.icon || icons[node.type] || '📄';
+            row.appendChild(iconDiv);
+
+            const label = document.createElement('span');
+            label.className = 'node-label';
+            label.textContent = node.name;
+            row.appendChild(label);
+
+            if (node.description && isLeaf) {
+                const desc = document.createElement('span');
+                desc.className = 'node-description';
+                desc.textContent = `— ${node.description}`;
+                row.appendChild(desc);
+            }
+
+            if (hasChildren) {
+                const count = document.createElement('span');
+                count.className = 'node-count';
+                count.textContent = `${countChildren(node)} items`;
+                row.appendChild(count);
+            }
+
+            div.appendChild(row);
+
+            if (hasChildren) {
+                const childrenDiv = document.createElement('div');
+                childrenDiv.className = 'children';
+                node.children.forEach(child => {
+                    childrenDiv.appendChild(createNode(child, level + 1));
+                });
+                div.appendChild(childrenDiv);
+            }
+
+            return div;
+        }
+
+        function renderTree() {
+            const container = document.getElementById('tree-container');
+            container.innerHTML = '';
+            const tree = document.createElement('div');
+            tree.className = 'tree';
+            tree.appendChild(createNode(data));
+            container.appendChild(tree);
+        }
+
+        function expandAll() {
+            document.querySelectorAll('.children').forEach(el => el.classList.remove('hidden'));
+            document.querySelectorAll('.toggle').forEach(el => el.classList.add('expanded'));
+        }
+
+        function collapseAll() {
+            document.querySelectorAll('.level-2 .children, .level-3 .children').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.level-2 .toggle, .level-3 .toggle').forEach(el => el.classList.remove('expanded'));
+        }
+
+        function searchTree(query) {
+            const q = query.toLowerCase().trim();
+            document.querySelectorAll('.branch').forEach(branch => {
+                const name = branch.dataset.name;
+                if (!q) {
+                    branch.classList.remove('hidden');
+                    branch.querySelector('.node-label').innerHTML = branch.querySelector('.node-label').textContent;
+                } else if (name.includes(q)) {
+                    branch.classList.remove('hidden');
+                    const label = branch.querySelector('.node-label');
+                    const text = label.textContent;
+                    const idx = text.toLowerCase().indexOf(q);
+                    if (idx >= 0) {
+                        label.innerHTML = text.slice(0, idx) +
+                            '<span class="highlight">' + text.slice(idx, idx + q.length) + '</span>' +
+                            text.slice(idx + q.length);
+                    }
+                    let parent = branch.parentElement;
+                    while (parent) {
+                        if (parent.classList.contains('branch')) parent.classList.remove('hidden');
+                        if (parent.classList.contains('children')) parent.classList.remove('hidden');
+                        parent = parent.parentElement;
+                    }
+                } else {
+                    branch.classList.add('hidden');
+                }
+            });
+            if (q) {
+                document.querySelectorAll('.children').forEach(el => el.classList.remove('hidden'));
+                document.querySelectorAll('.toggle').forEach(el => el.classList.add('expanded'));
+            }
+        }
+
+        renderTree();
+    </script>
+</body>
+</html>
