@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Base</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #05051a;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .bg-gradient {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background:
+                radial-gradient(ellipse at 20% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(6, 182, 212, 0.05) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        header {
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 32px;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 4px;
+            border-radius: 12px;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 13px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .tab:hover {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .tab.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .stats {
+            display: flex;
+            gap: 24px;
+        }
+
+        .stat { text-align: center; }
+        .stat-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #34d399, #22d3ee);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-label {
+            font-size: 0.6rem;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-top: 2px;
+        }
+
+        /* View containers */
+        .view {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 1;
+        }
+
+        .view.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Tree View Styles */
+        #tree-view {
+            padding: 100px 60px 60px 60px;
+            overflow: auto;
+        }
+
+        #tree-view::-webkit-scrollbar { width: 8px; }
+        #tree-view::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+        #tree-view::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+        .branch { margin-left: 0; }
+
+        .node-row {
+            display: flex;
+            align-items: center;
+            padding: 8px 14px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            gap: 12px;
+            margin: 2px 0;
+        }
+
+        .node-row:hover { background: rgba(255,255,255,0.04); }
+        .node-row.leaf:hover {
+            background: rgba(52, 211, 153, 0.08);
+            box-shadow: 0 0 20px rgba(52, 211, 153, 0.1);
+        }
+
+        .node-icon {
+            width: 32px; height: 32px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: all 0.2s ease;
+        }
+
+        .node-row:hover .node-icon { transform: scale(1.05); }
+
+        .node-icon.root { background: linear-gradient(135deg, #818cf8, #c084fc); box-shadow: 0 4px 20px rgba(129, 140, 248, 0.3); }
+        .node-icon.category { background: linear-gradient(135deg, #818cf8, #a78bfa); box-shadow: 0 4px 20px rgba(129, 140, 248, 0.25); }
+        .node-icon.subcategory { background: linear-gradient(135deg, #06b6d4, #22d3ee); box-shadow: 0 4px 20px rgba(6, 182, 212, 0.25); }
+        .node-icon.concept { background: linear-gradient(135deg, #10b981, #34d399); box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25); }
+        .node-icon.tool { background: linear-gradient(135deg, #f59e0b, #fbbf24); box-shadow: 0 4px 20px rgba(245, 158, 11, 0.25); }
+        .node-icon.diagram { background: linear-gradient(135deg, #ec4899, #f472b6); box-shadow: 0 4px 20px rgba(236, 72, 153, 0.25); }
+
+        .node-label { font-size: 14px; color: rgba(255,255,255,0.9); font-weight: 500; }
+        .node-description { font-size: 12px; color: rgba(255,255,255,0.35); margin-left: 8px; }
+        .node-count {
+            font-size: 10px;
+            color: rgba(255,255,255,0.3);
+            margin-left: auto;
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.04);
+            border-radius: 20px;
+        }
+
+        .children {
+            margin-left: 44px;
+            border-left: 1px solid rgba(255,255,255,0.06);
+            padding-left: 24px;
+        }
+
+        .toggle {
+            width: 20px; height: 20px; border-radius: 6px;
+            background: rgba(255,255,255,0.06);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 9px; color: rgba(255,255,255,0.4);
+            flex-shrink: 0; transition: all 0.2s ease;
+        }
+        .toggle:hover { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7); }
+        .toggle.expanded { transform: rotate(90deg); }
+        .leaf .toggle { visibility: hidden; }
+
+        .level-0 > .node-row .node-label { font-size: 22px; font-weight: 700; }
+        .level-1 > .node-row .node-label { font-size: 17px; font-weight: 600; }
+        .level-2 > .node-row .node-label { font-size: 15px; font-weight: 600; }
+
+        .level-0 > .node-row .node-icon { width: 40px; height: 40px; font-size: 20px; }
+        .level-1 > .node-row .node-icon { width: 36px; height: 36px; font-size: 17px; }
+
+        .level-1 > .children { margin-left: 50px; }
+        .level-2 > .children { margin-left: 46px; }
+
+        /* Graph View Styles */
+        #graph-view svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .node-glow { filter: url(#glow); }
+
+        .graph-label {
+            font-family: 'Inter', sans-serif;
+            fill: rgba(255, 255, 255, 0.9);
+            pointer-events: none;
+            font-weight: 500;
+            font-size: 10px;
+        }
+
+        .graph-label.category { font-size: 13px; font-weight: 700; fill: #fff; }
+        .graph-label.subcategory { font-size: 11px; font-weight: 600; }
+
+        .link { stroke-linecap: round; }
+
+        /* Shared UI */
+        .search-box {
+            position: fixed;
+            top: 100px;
+            left: 28px;
+            z-index: 100;
+        }
+
+        .search-box input {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #fff;
+            padding: 14px 20px;
+            border-radius: 14px;
+            font-size: 13px;
+            font-family: inherit;
+            width: 260px;
+            outline: none;
+            backdrop-filter: blur(20px);
+            transition: all 0.2s ease;
+        }
+
+        .search-box input::placeholder { color: rgba(255, 255, 255, 0.3); }
+        .search-box input:focus {
+            border-color: rgba(129, 140, 248, 0.5);
+            box-shadow: 0 0 20px rgba(129, 140, 248, 0.15);
+        }
+
+        .legend {
+            position: fixed;
+            bottom: 28px;
+            left: 28px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 20px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            z-index: 100;
+        }
+
+        .legend-title {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            font-weight: 600;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            display: flex;
+            gap: 12px;
+            z-index: 100;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.7);
+            padding: 12px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(20px);
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(15, 15, 35, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 18px 22px;
+            color: #fff;
+            font-size: 13px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            max-width: 320px;
+            z-index: 200;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .tooltip.visible { opacity: 1; }
+        .tooltip h3 {
+            margin-bottom: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .tooltip .type-badge {
+            display: inline-block;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            margin-bottom: 12px;
+        }
+
+        .tooltip p { color: rgba(255, 255, 255, 0.7); line-height: 1.6; }
+
+        .generated-info {
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.25);
+            z-index: 100;
+        }
+
+        .generated-info a {
+            color: rgba(255, 255, 255, 0.4);
+            text-decoration: none;
+        }
+
+        .highlight { background: rgba(251, 191, 36, 0.25); border-radius: 4px; padding: 0 2px; }
+        .hidden { display: none !important; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(5, 5, 26, 0.9);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.visible {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+        }
+
+        .modal {
+            background: rgba(15, 15, 35, 0.98);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            max-width: 700px;
+            max-height: 80vh;
+            width: 90%;
+            overflow: hidden;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(99, 102, 241, 0.15);
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-overlay.visible .modal { transform: scale(1); }
+
+        .modal-header {
+            padding: 24px 28px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .modal-header .node-icon { width: 44px; height: 44px; font-size: 22px; border-radius: 12px; }
+
+        .modal-title { flex: 1; }
+        .modal-title h2 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0;
+        }
+
+        .modal-title .modal-path {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.3);
+            margin-top: 6px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .modal-close {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.6);
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .modal-close:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+
+        .modal-content {
+            padding: 28px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-content pre {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.7;
+            color: rgba(255, 255, 255, 0.85);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+        }
+
+        .modal-description {
+            background: rgba(52, 211, 153, 0.08);
+            border-left: 3px solid #34d399;
+            padding: 14px 18px;
+            margin-bottom: 24px;
+            border-radius: 0 12px 12px 0;
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+
+    <header>
+        <h1>Knowledge Base</h1>
+        <div class="tabs">
+            <button class="tab active" onclick="switchView('tree')">Tree</button>
+            <button class="tab" onclick="switchView('graph')">Graph</button>
+        </div>
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value">46</div>
+                <div class="stat-label">Entries</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">34</div>
+                <div class="stat-label">Concepts</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">6</div>
+                <div class="stat-label">Tools</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="search-box">
+        <input type="text" id="search" placeholder="Search..." oninput="handleSearch(this.value)">
+    </div>
+
+    <!-- Tree View -->
+    <div id="tree-view" class="view active"></div>
+
+    <!-- Graph View -->
+    <div id="graph-view" class="view"></div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <div class="legend">
+        <div class="legend-title">Node Types</div>
+        <div class="legend-item"><div class="legend-color" style="background: #818cf8; color: #818cf8;"></div><span>Category</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #34d399; color: #34d399;"></div><span>Concept</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #fbbf24; color: #fbbf24;"></div><span>Tool</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #f472b6; color: #f472b6;"></div><span>Diagram</span></div>
+    </div>
+
+    <div class="controls" id="tree-controls">
+        <button class="control-btn" onclick="expandAll()">Expand All</button>
+        <button class="control-btn" onclick="collapseAll()">Collapse All</button>
+    </div>
+
+    <div class="controls" id="graph-controls" style="display: none;">
+        <button class="control-btn" onclick="resetGraphView()">Reset View</button>
+        <button class="control-btn" onclick="toggleLabels()">Toggle Labels</button>
+    </div>
+
+    <div class="generated-info">
+        Generated from <a href="https://ensue-network.ai">Ensue</a> &bull; 1/7/2026
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="node-icon" id="modal-icon"></div>
+                <div class="modal-title">
+                    <h2 id="modal-name"></h2>
+                    <div class="modal-path" id="modal-path"></div>
+                </div>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-content">
+                <div class="modal-description" id="modal-description"></div>
+                <pre id="modal-text"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const treeData = {"name":"Knowledge Base","type":"root","icon":"🧠","children":[{"name":"concepts","type":"category","icon":"💡","children":[{"name":"computing","type":"subcategory","icon":"💻","children":[{"name":"bundlers","key":"public/concepts/computing/bundlers","description":"What bundlers (webpack) do - combine files for production","content":"BUNDLERS (Webpack, etc.)\n\nProblem: Your project has 50 JavaScript files, 20 CSS files. Loading 70 files = slow.\n\nSolution: Bundler combines them into fewer, optimized files.\n\nBefore (development):\nsrc/\n  components/Header.js, Footer.js, Button.js\n  utils/helpers.js\n  styles/main.css, buttons.css\n\nAfter (production):\ndist/\n  bundle.js (all JS combined)\n  styles.css (all CSS combined)\n\n50 files -> 2 files = faster page load\n\nBundlers also:\n- Minify code (remove whitespace, shorten names)\n- Transform modern JS to work in old browsers\n- Optimize images\n\nWebpack = most common, complex\nBun = has built-in bundler, simpler","type":"concept"},{"name":"client-server-architecture","key":"public/concepts/computing/client-server-architecture","description":"How apps and browsers are just UI clients to servers","content":"CLIENT-SERVER ARCHITECTURE\n\nCLIENT = asks for things (your phone, browser, app)\nSERVER = provides things (company servers, databases)\n\nKey insight: APPS ARE JUST UI. Like browsers, apps just:\n- Show buttons, images, text\n- Collect your taps and input\n- Send requests to server\n- Display responses\n\nThe REAL STUFF (logic, data, authentication, payments) happens on the company servers. Your app is a fancy remote control.\n\nExamples:\n- Browser -> displays HTML from servers\n- Instagram app -> displays UI/data from Instagram servers\n- Banking app -> just UI, all money logic is on bank servers","type":"concept"},{"name":"common-services-overview","key":"public/concepts/computing/common-services-overview","description":"Overview of common network services and their ports","content":"COMMON SERVICES AND THEIR PORTS\n\nPort 22 - SSH (Secure Shell)\nRemote terminal access. Type commands on your laptop, they run on another computer. Like a remote keyboard for servers.\n\nPort 80 - HTTP\nUnencrypted web traffic. Old/obsolete. Anyone watching network can see data.\n\nPort 443 - HTTPS\nEncrypted web traffic. Modern standard. Safe for passwords, banking. The padlock icon.\n\nPort 5432 - PostgreSQL\nPort 3306 - MySQL\nPort 27017 - MongoDB\nDatabase servers. Where apps store data permanently. Different software, same purpose - like Word vs Google Docs.\n\nPort 6379 - Redis\nFast cache in RAM (not disk). Server-side temporary data. \"Is user logged in?\" \"Cached stock price.\" Microseconds vs milliseconds.\n\nPort 3000 - Dev Server\nLocal development. Run your code on your own machine, test at localhost:3000 before deploying to real server.","type":"concept"},{"name":"databases-explained","key":"public/concepts/computing/databases-explained","description":"What databases are and where data is stored","content":"DATABASES - Where App Data Lives\n\nDatabases store data permanently. They listen on a port, apps connect and query.\n\nTypical architecture:\n\n[Your Phone]  ->  [Company Server]  ->  [Database Server]\n   (app UI)       (app logic)          (data storage)\n\nExample - Instagram:\n- Your phone has Instagram APP (just interface)\n- Instagram SERVERS run code that handles requests\n- Instagram DATABASE stores photos, users, likes\n\nWhen you post a photo:\n1. Phone uploads to Instagram server\n2. Server saves photo + records in database\n3. Database is on INSTAGRAM machines, not your phone\n\nPostgreSQL, MySQL, MongoDB = different database software. Same purpose, different products. Like Word vs Google Docs vs Pages for documents.","type":"concept"},{"name":"dev-server-explained","key":"public/concepts/computing/dev-server-explained","description":"What a dev server is - local development environment","content":"DEV SERVER - Local Development (often Port 3000)\n\nA dev server runs your code locally on your laptop so you can test it.\n\nWorkflow:\n1. You write code\n2. Dev server runs it on your machine\n3. You open localhost:3000 in browser\n4. You see your website, test it, make changes\n\n\"localhost\" = your own computer\n\"localhost:3000\" = port 3000 on your own machine\n\nThe dev server:\n- Runs your code\n- Watches for file changes\n- Reloads automatically when you edit\n- Only accessible from YOUR computer (not the internet)\n\nWhen ready to go live, you DEPLOY to a real server that is accessible to everyone. Dev server is just for testing.","type":"concept"},{"name":"disk-vs-ram","key":"public/concepts/computing/disk-vs-ram","description":"Difference between disk storage and RAM memory","content":"DISK VS RAM\n\nRAM (memory):\n- Fast, temporary\n- Lost when laptop restarts or loses power\n- Running programs live here\n- Limited size (8GB, 16GB, 32GB typical)\n\nDISK (storage - SSD/hard drive):\n- Slower than RAM, but permanent\n- Survives restarts\n- Files, photos, apps, caches live here\n- Large size (256GB, 512GB, 1TB typical)\n\nExample - Bun cache:\n- Cache is stored on DISK (~/.bun/install/cache/)\n- Survives restarts\n- Install axios today, restart 100 times, cache still there\n- Next project needing axios = instant, no re-download\n\nWhen people say \"clear your cache\" they mean delete cached files from disk. When they say \"restart to clear memory\" they mean RAM.","type":"concept"},{"name":"e2ee-trust-model","key":"public/concepts/computing/e2ee-trust-model","description":"How we can verify that E2EE services like Signal don't have our keys","content":"E2EE TRUST MODEL\n\nHow do we know Signal/WhatsApp don't have our encryption keys?\n\n1. KEYS GENERATED ON YOUR DEVICE\n\nYour Phone                    Signal Server\n──────────                    ─────────────\nGenerates:\n  - Private key (SECRET)  →   never sent\n  - Public key            →   uploaded (so others can encrypt TO you)\n\nSignal never sees your private key - it's born on your phone and stays there.\n\n2. OPEN SOURCE CODE\n\nSignal's code is public on GitHub. Security researchers:\n- Read exactly what the app does\n- Verify keys are generated locally\n- Verify private keys aren't transmitted\n- Check for backdoors\n\nThousands of cryptographers have audited it.\n\n3. PUBLIC CRYPTOGRAPHY\n\nSignal Protocol is published. Anyone can verify:\n- The math is sound\n- The implementation matches the spec\n- There's no way to decrypt without the private key\n\n4. REPRODUCIBLE BUILDS\n\nYou can compile Signal's source code yourself and verify it produces\nthe exact same app in the App Store. Proves no hidden backdoors.\n\nTHE TRUST SPECTRUM\n\nFull trust required    <──────────────────>    Verifiable\n\n     WhatsApp                 Signal              Bitcoin\n        │                       │                    │\n   Closed source          Open source          Open source\n   \"Trust us\"             Audited code         + decentralized\n   Meta owns it           Non-profit           No single owner\n\nWHATSAPP CAVEAT\nClaims E2EE using Signal Protocol, but:\n- Code is closed source (can't verify)\n- Owned by Meta (incentive to collect data)\n- You have to trust their claim\n\nTHE HONEST ANSWER\nEven with Signal, you trust:\n- The app matches the open source code\n- Your phone's OS isn't compromised\n- No unknown flaw in the cryptography\n\nBut it's VERIFIABLE trust - experts CAN check it, unlike \"just trust us.\"","type":"concept"},{"name":"frontend-vs-backend","key":"public/concepts/computing/frontend-vs-backend","description":"What is front-end vs back-end and what languages are used","content":"FRONT-END VS BACK-END\n\nFRONT-END (client-side):\n- What you see and touch\n- Runs on YOUR device\n- Languages: HTML, CSS, JavaScript, TypeScript\n- Frameworks: React, Vue, Angular\n- Mobile: Swift (iOS), Kotlin (Android), Flutter, React Native\n\nBACK-END (server-side):\n- What you do not see\n- Runs on THEIR servers\n- Languages: Python, Java, Go, Rust, Node.js, Ruby\n- Handles: Databases, APIs, authentication, payments, business logic\n\nApps on your phone are mostly front-end. They talk to back-end servers for data and logic. The app is the UI, the server is the brain.","type":"concept"},{"name":"how-browsers-find-websites","key":"public/concepts/computing/how-browsers-find-websites","description":"DNS lookup and how browsers connect to web servers","content":"HOW BROWSERS FIND WEBSITES\n\nWhen you type https://amazon.com:\n\n1. Browser asks DNS: \"What IP is amazon.com?\"\n   DNS answers: \"176.32.103.205\"\n\n2. Browser connects to 176.32.103.205:443\n   (IP address + port 443 for HTTPS)\n\n3. Amazon server sends back HTML/CSS/JS\n\n4. Your browser renders it on screen\n\nDNS = Domain Name System = the phonebook of the internet. Translates human-readable names (google.com) to machine-readable IPs (142.250.80.46).\n\nEVERY HTTPS website uses port 443. The DOMAIN NAME determines which server. The PORT determines which service on that server.\n\nhttps://amazon.com  -> Amazon IP, port 443\nhttps://google.com  -> Google IP, port 443\nhttps://mysite.com  -> My server IP, port 443","type":"concept"},{"name":"https-beyond-browsers","key":"public/concepts/computing/https-beyond-browsers","description":"HTTPS is used for more than just websites","content":"HTTPS IS NOT JUST FOR WEBSITES\n\nHTTPS (port 443) is a general protocol for sending/receiving data securely. Used by:\n\n- Browsers fetching websites (what most people know)\n- Apps fetching data (Instagram loading your feed)\n- Package managers downloading packages (npm, bun)\n- Chat apps sending messages (Slack, Discord)\n- APIs communicating (any app talking to a server)\n\nWhen bun connects to registry.npmjs.org:443, its the same protocol your browser uses for amazon.com:443. Same encryption, same port. Just different data being transferred.\n\nHTTPS = the universal language of the internet. Almost everything uses it.","type":"concept"},{"name":"legacy-vs-greenfield","key":"public/concepts/computing/legacy-vs-greenfield","description":"Why new software built from scratch is often more efficient than legacy software","content":"LEGACY VS GREENFIELD SOFTWARE\n\nWhy new tools are often faster than established ones.\n\nTHE LEGACY PROBLEM\nSoftware built years ago accumulates:\n- Old code paths that can't be removed (backwards compatibility)\n- Workarounds for problems that no longer exist\n- Architecture decisions that made sense then but are suboptimal now\n- Layers of abstraction built on other layers\n\nTHE GREENFIELD ADVANTAGE\nStarting fresh means you can:\n- Learn from predecessors' mistakes\n- Design architecture knowing modern patterns upfront\n- Choose better languages/tools available now\n- Skip backwards compatibility, support only current standards\n- Integrate features that were bolted on later\n\nEXAMPLES\n| Legacy          | Greenfield Replacement      |\n|-----------------|-----------------------------|                   \n| npm             | Bun, pnpm                   |\n| Webpack         | Vite, esbuild               |\n| REST APIs       | GraphQL                     |\n| Create React App| Vite, Next.js               |\n\nTHE TRADEOFF\nLegacy: stability, huge ecosystem, battle-tested edge cases\nGreenfield: faster, cleaner, but may have gaps and less community support\n\nBun vs npm is a textbook example: npm built in 2010 in JavaScript, Bun built in 2022 in Zig with 12 years of hindsight.","type":"concept"},{"name":"mental-model-summary","key":"public/concepts/computing/mental-model-summary","description":"Big picture mental model tying client-server concepts together","content":"MENTAL MODEL: THE BIG PICTURE\n=============================\n\n1. SERVERS are just computers that LISTEN and SERVE.\n   Any computer can be a server if it runs server software.\n\n2. CLIENTS are computers that CONNECT and REQUEST.\n   Your phone, browser, apps are clients.\n\n3. PORTS differentiate services on one machine.\n   IP = which building. Port = which apartment.\n\n4. APPS ARE JUST UI.\n   Real logic, data, security runs on company servers.\n   Your app is a fancy remote control.\n\n5. DATABASES live on servers, not your phone.\n   Apps send data to remote databases for storage.\n\n6. When YOU run Clawdbot, YOU become a server.\n   Your laptop listens on a port. Your phone connects to it.\n   Role reversal: now you are serving, not just consuming.\n\nThe internet is just computers listening on ports and other computers connecting to them. That is the whole thing.","type":"concept"},{"name":"nodejs-runtime","key":"public/concepts/computing/nodejs-runtime","description":"What Node.js is - a runtime that executes JavaScript","content":"NODE.JS - JavaScript Runtime\n\nA RUNTIME is the thing that actually executes code.\n\nHistory:\n- JavaScript was invented for browsers\n- 2009: Node.js created to run JavaScript OUTSIDE browsers\n- Now you can run JavaScript on servers, laptops, anywhere\n\nBrowser JavaScript vs Node.js:\n\nBROWSER:\n- Runs inside web page\n- Can manipulate webpage\n- Cannot read your files\n\nNODE.JS:\n- Runs on computer directly\n- Can read/write files\n- Can run servers\n- Cannot manipulate webpages (no browser)\n\nWhen you run \"node app.js\" or \"bun app.js\", the runtime reads your code and executes it.","type":"concept"},{"name":"npm-registry","key":"public/concepts/computing/npm-registry","description":"What the npm registry is and who maintains it","content":"NPM REGISTRY\n\nWhat: Giant server storing 2+ million JavaScript packages\nURL: registry.npmjs.org\nOwned by: npm Inc (owned by GitHub, owned by Microsoft)\n\nCost:\n- Download packages: FREE (always)\n- Publish public packages: FREE\n- Private packages: Paid tiers for companies\n\nBusiness model: Like YouTube - free to use, company makes money from enterprise customers.\n\nBoth npm and bun download from the SAME registry. Bun is not a separate server. Its just a faster client that talks to the same npm registry.\n\nWhen you publish a package, you upload to npm registry. Anyone can then install it with npm OR bun.","type":"concept"},{"name":"package-managers","key":"public/concepts/computing/package-managers","description":"What package managers (npm, bun) are and why they exist","content":"PACKAGE MANAGERS (npm, bun, etc.)\n\nProblem they solve:\nYou don't want to build everything from scratch. Someone already wrote code for HTTP requests, date handling, etc. Package managers let you download and use other people's code automatically.\n\nWithout package manager:\n1. Find library on internet\n2. Download zip\n3. Figure out its dependencies\n4. Download those too\n5. Repeat forever\n\nWith package manager:\n1. Type: npm install axios\n2. Done\n\nKey files:\n- package.json: Shopping list of packages you need\n- package-lock.json / bun.lockb: Exact versions installed\n- node_modules/: Folder containing all downloaded code\n\nBoth npm and bun download from the SAME registry (registry.npmjs.org). Bun is just a faster client.\n\n---\n\nWHY BUN IS FASTER THAN NPM\n\n1. Language: Zig vs JavaScript\n   - npm runs on Node.js (JavaScript interpreted by V8)\n   - Bun is written in Zig, compiles to native machine code\n   - No interpreter overhead, CPU runs it directly\n\n2. Integrated vs Modular\n   - npm is JUST a package manager (node, npx, webpack are separate processes)\n   - Bun is all-in-one: runtime + package manager + bundler + test runner\n   - No overhead spawning separate processes, everything shares memory\n\n3. Parallelization\n   - npm: more sequential (conservative, designed for older machines)\n   - Bun: downloads, extracts, and links in parallel (assumes modern multi-core CPUs)\n\n4. Global Cache with Hardlinks\n   - npm: traditionally copied packages per project (newer versions improved)\n   - Bun: downloads once to global cache, uses hardlinks\n   - 10 projects using React = 1 copy on disk, not 10\n\n5. Native HTTP\n   - npm: Node.js HTTP libraries (JavaScript)\n   - Bun: native HTTP client in Zig, optimized for package downloads","type":"concept"},{"name":"ports-listening-vs-connecting","key":"public/concepts/computing/ports-listening-vs-connecting","description":"Understanding when ports are used - servers listen, clients connect","content":"PORTS: LISTENING VS CONNECTING\n\nYour laptop has 65,535 ports, but most have NOTHING LISTENING.\n\nWhen you VISIT a website (you are the client):\n- Amazon server listens on port 443\n- Your laptop connects FROM a random port TO their 443\n- You are not listening on 443 - they are\n\nWhen you RUN Clawdbot (you are the server):\n- Your laptop listens on port 18789\n- Your phone connects TO your 18789\n- Now you are the server\n\nPorts are like phone extensions:\n- A company has extensions 101, 102, 103\n- If no one is assigned to extension 105, calls to 105 go nowhere\n- Only ports with programs listening will respond\n\nIf you are not running server software, your ports 22, 80, 443, 5432 etc. are all silent - nothing is listening.","type":"concept"},{"name":"redis-explained","key":"public/concepts/computing/redis-explained","description":"What Redis is - server-side cache for speed","content":"REDIS - Fast Server-Side Cache (Port 6379)\n\nRedis stores temporary data in RAM for speed. It lives on the SERVER side, not your browser.\n\nWhy not just use the database?\n- Database (PostgreSQL): stored on disk -> slower (milliseconds)\n- Redis: stored in RAM -> faster (microseconds)\n\nUse cases:\n- \"Is user #123 logged in?\" (session data)\n- \"What is current Bitcoin price?\" (cached for 10 seconds)\n- \"Rate limiting: has this IP made >100 requests this minute?\"\n\nNOT for:\n- Browser back-button cache (that is browser memory, not Redis)\n- Permanent data (Redis is temporary, can be lost on restart)\n\nThink of Redis as short-term memory for servers. Fast access to frequently-needed info without hitting the slow database every time.","type":"concept"},{"name":"rendering-gpu-vs-cpu","key":"public/concepts/computing/rendering-gpu-vs-cpu","description":"What renders web pages and apps - GPU vs CPU roles","content":"RENDERING: GPU VS CPU\n\nBoth are used, but different tasks:\n\nCPU handles:\n- HTML/CSS parsing (reading and understanding code)\n- Layout calculation (where does each element go?)\n- Text rendering\n- JavaScript execution\n- Basic graphics\n\nGPU handles (hardware acceleration):\n- Heavy animations\n- Video playback\n- 3D graphics (WebGL, games)\n- Smooth scrolling\n- Visual effects\n\nModern browsers offload visual work to GPU when possible. But a basic webpage works fine with just CPU. GPU makes things smoother and faster for graphics-heavy content.","type":"concept"},{"name":"shell-compatibility-in-docs","key":"public/concepts/computing/shell-compatibility-in-docs","description":"When to care about bash vs zsh when reading or writing documentation","content":"SHELL COMPATIBILITY IN DOCS\n\nWHEN READING DOCS\n90 percent of the time: just run the commands. Basic commands work everywhere:\ncd, ls, git clone, npm install, export VAR=value\n\nThese work in sh, bash, zsh, fish - all of them.\n\nWATCH OUT FOR\n- fish has different syntax (set -x VAR instead of export VAR=)\n- If something fails, search for command plus your shell name\n- Advanced syntax might be bash/zsh only\n\nWHEN WRITING DOCS\nJust write the commands. Do not specify a shell.\n\nGood:\n  git clone URL\n  cd repo\n  bun install\n\nUnnecessary:\n  Installation for bash/zsh\n\nONLY MENTION SHELL WHEN\n1. Teaching shell scripting - show the shebang line\n2. Config files - mention both ~/.zshrc and ~/.bashrc\n3. Using syntax that might not work everywhere\n\nTL;DR\n- Reading docs: just run it, probably works\n- Writing docs: do not mention shell unless it matters\n- Config files: mention both zshrc and bashrc","type":"concept"},{"name":"shell-scripts","key":"public/concepts/computing/shell-scripts","description":"What shell scripts are and when to use them","content":"SHELL SCRIPTS\n\nA shell script is a text file containing commands that run in sequence. Instead of typing commands one by one, save them in a file and run all at once.\n\nBASIC EXAMPLE\nFile: setup.sh\n\n#!/bin/bash\necho Setting up...\nmkdir my-project\ncd my-project\ngit init\necho Done!\n\nRun it:\nchmod +x setup.sh    # Make executable once\n./setup.sh           # Run it\n\nTHE SHEBANG (first line)\n#!/bin/bash - Use bash\n#!/bin/zsh - Use zsh\n#!/bin/sh - Use basic sh (most compatible)\n\nTells the system which shell runs the script.\n\nCOMMON PATTERNS\n\nVariables:\nNAME=Christine\necho Hello $NAME\n\nArguments:\n$1 = first argument passed in\n$2 = second argument\n\nWHEN TO USE SHELL SCRIPTS\nGood for: running commands in sequence, automating tasks, build scripts, gluing programs together.\n\nUse a real language for: complex logic, error handling, data processing.","type":"concept"},{"name":"ssh-explained","key":"public/concepts/computing/ssh-explained","description":"What SSH is and when you would use it","content":"SSH (Secure Shell) - Port 22\n\nRemote terminal access to another computer.\n\nYour laptop                         Remote server\n    |                                   |\n    |   \"ls -la\" ---------------------> | runs command\n    |                                   |\n    | <--------------------- file listing   |\n\nUse cases:\n- You have a server in a data center. SSH in to update software, check logs, restart services.\n- You are at a coffee shop, need to run commands on home server.\n- Deploying code to production server.\n\nSSH is encrypted - safe over public WiFi. Like having a secure remote keyboard to any computer in the world.","type":"concept"},{"name":"terminal-vs-shell","key":"public/concepts/computing/terminal-vs-shell","description":"The difference between terminal emulators and shells","content":"TERMINAL VS SHELL\n\nTwo different things that work together.\n\nTERMINAL (Terminal Emulator)\nThe window/app that displays text.\nHandles: fonts, colors, keyboard input, rendering, splits, tabs.\nExamples: Ghostty, macOS Terminal, iTerm2\n\nSHELL\nThe program running INSIDE the terminal.\nInterprets your commands and executes them.\nExamples: zsh, bash, fish, sh\n\nANALOGY\nTerminal = TV screen\nShell = The show playing on it\n\nYou can run different shells in the same terminal, or the same shell in different terminals.\n\nCOMMON SHELLS\nsh (1979) - The grandfather, super basic\nbash (1989) - Reliable workhorse, Linux default\nzsh (1990) - macOS default since 2019, bash plus nicer features\nfish (2005) - Modern, friendly, intentionally different syntax\n\nFor daily use, they are mostly the same. Basic commands (cd, ls, git, bun) work in all of them.","type":"concept"},{"name":"thin-vs-thick-client","key":"public/concepts/computing/thin-vs-thick-client","description":"Difference between thin clients (mostly UI) and thick clients (local processing)","content":"THIN CLIENT VS THICK CLIENT\n\nTHIN CLIENT (dumb client):\n- Mostly UI, real work happens on server\n- Without internet: useless\n- Examples: Facebook app, Instagram, Banking app, Uber\n- The app just displays what server sends and forwards your input back\n\nTHICK CLIENT (local program):\n- Does real work locally on your device\n- Without internet: still works (mostly)\n- Examples: Photoshop, VS Code, Calculator, VLC, Bun\n- May connect to internet for some features, but core functionality is local\n\nIts a spectrum, not binary:\nCalculator (100% local) <-> Banking app (100% server)\n\nHow to tell: Ask \"what happens if I turn off internet?\"\n- Useless = thin client\n- Still works = thick client\n\nTerms mean the same: app, program, application. The thin/thick distinction is about WHERE the work happens.","type":"concept"},{"name":"tls-vs-e2ee","key":"public/concepts/computing/tls-vs-e2ee","description":"Difference between TLS (transport encryption) and end-to-end encryption","content":"TLS VS END-TO-END ENCRYPTION\n\nTwo different types of encryption that protect different things.\n\nTLS (Transport Layer Security) - what HTTPS uses:\n\nYou  <───encrypted───>  Server\n         (TLS)            ↓\n                    Server decrypts,\n                    reads your request,\n                    processes it\n\n- Protects data IN TRANSIT (your ISP, wifi hackers can't snoop)\n- Server CAN read your data (it must, to serve you)\n- Used for: websites, APIs, any HTTPS connection\n\nEnd-to-End Encryption (E2EE) - what Signal uses:\n\nYou  <───encrypted───>  Server  <───encrypted───>  Friend\n                          ↓\n                   Server CANNOT read\n                   (only passes encrypted blob)\n\n- Even the server in the middle can't decrypt\n- Only the endpoints (you and recipient) have the keys\n- Used for: private messaging, password managers\n\nKEY INSIGHT\n- TLS = \"nobody between us can read this\"\n- E2EE = \"nobody except us can read this, not even the service provider\"\n\nWHY IT MATTERS\n- If Amazon gets hacked, they have your data (TLS protected transit, not storage)\n- If Signal gets hacked, attackers get encrypted blobs they can't read","type":"concept"},{"name":"visual-bun-install-process","key":"public/concepts/computing/visual-bun-install-process","description":"Visual diagram of what happens when you run bun install","content":"VISUAL: WHAT HAPPENS WHEN YOU RUN BUN INSTALL\n==============================================\n\nYOU\n |\n | type \"bun install\"\n v\n+-------------------------------------------------------------+\n|                     YOUR LAPTOP                             |\n|                                                             |\n|   Terminal --> Bun program starts                           |\n|                    |                                        |\n|                    v                                        |\n|              +----------+     +-------------------------+   |\n|              |   Bun    |---->|  ~/.bun/install/cache/  |   |\n|              |          |     |  (check local cache)    |   |\n|              |          |     +-------------------------+   |\n|              |          |                                   |\n|              +----+-----+                                   |\n|                   |                                         |\n+-------------------|-----------------------------------------+\n                    |\n                    | HTTPS requests (only if not cached)\n                    v\n          +---------------------+\n          |    NPM REGISTRY     |\n          | (registry.npmjs.org)|\n          |    port 443         |\n          +---------------------+\n\nSteps:\n1. Bun reads package.json (what packages needed)\n2. Checks local cache (already downloaded before?)\n3. If not cached: downloads from npm registry via HTTPS\n4. Extracts to node_modules/ folder\n5. Saves to cache for next time\n6. Creates lockfile with exact versions\n\nSecond install of same package = instant (from cache, no network).","type":"diagram"},{"name":"visual-client-server-diagram","key":"public/concepts/computing/visual-client-server-diagram","description":"Visual diagram showing apps as UI clients to servers","content":"VISUAL: APPS ARE JUST UI (Client-Server)\n=========================================\n\n+-------------------------------------------------------------+\n|                        YOUR PHONE                           |\n|                                                             |\n|   +-----------------------------------------------------+   |\n|   |                    APP (Client)                     |   |\n|   |                                                     |   |\n|   |   - Shows buttons, images, text                     |   |\n|   |   - Collects your taps and input                    |   |\n|   |   - Sends requests to server                        |   |\n|   |   - Displays responses                              |   |\n|   |                                                     |   |\n|   |   Basically: FANCY REMOTE CONTROL                   |   |\n|   +-----------------------------------------------------+   |\n+-------------------------------------------------------------+\n                              |\n                              v\n+-------------------------------------------------------------+\n|                     COMPANY SERVERS                         |\n|                                                             |\n|   - Runs the actual logic                                   |\n|   - Authenticates you                                       |\n|   - Queries database                                        |\n|   - Processes payments                                      |\n|   - Enforces rules                                          |\n|                                                             |\n|   THE REAL STUFF HAPPENS HERE                               |\n+-------------------------------------------------------------+\n                              |\n                              v\n+-------------------------------------------------------------+\n|                       DATABASE                              |\n|                                                             |\n|   - Stores all data permanently                             |\n|   - Users, posts, orders, everything                        |\n+-------------------------------------------------------------+","type":"diagram"},{"name":"visual-ports-listening","key":"public/concepts/computing/visual-ports-listening","description":"Visual diagram showing when ports are listening vs not","content":"VISUAL: PORTS - LISTENING VS NOT LISTENING\n===========================================\n\nYOUR LAPTOP (as normal user - not running servers):\n\n    Port 22    --- (silence) nobody listening\n    Port 80    --- (silence) nobody listening\n    Port 443   --- (silence) nobody listening\n    Port 5432  --- (silence) nobody listening\n\n    You CONNECT to other servers. Nothing connects to you.\n\n\nYOUR LAPTOP (running Clawdbot):\n\n    Port 22    --- (silence)\n    Port 80    --- (silence)\n    Port 443   --- (silence)\n    Port 18789 --- CLAWDBOT LISTENING <-- phone connects here\n\n    Now you are a server. You LISTEN for connections.\n\n\nAMAZON SERVER:\n\n    Port 443   --- WEB SERVER LISTENING <-- millions of browsers connect\n    Port 5432  --- DATABASE LISTENING <-- their app servers connect\n    Port 22    --- SSH LISTENING <-- their engineers connect\n\n    They are a server. They LISTEN for connections.","type":"diagram"},{"name":"what-is-a-server","key":"public/concepts/computing/what-is-a-server","description":"Definition of a server - it is a role, not special hardware","content":"A SERVER is just a computer that provides a service to other computers. The word describes its ROLE, not its hardware.\n\nYour laptop can be a server.\nA $50 Raspberry Pi can be a server.\nA $10,000 machine in a data center can be a server.\n\nIf your laptop runs a web server program, it becomes a web server. If it runs Clawdbot Gateway, it becomes a message server. The moment you run software that LISTENS for incoming connections and SERVES responses, you have a server.","type":"concept"},{"name":"what-is-streaming","key":"public/concepts/computing/what-is-streaming","description":"What streaming means - receiving data continuously in real-time","content":"STREAMING = receiving data continuously in real-time, not downloading all at once.\n\nDOWNLOAD:\nWait... wait... wait...\n[================] 100%\nNOW you can watch\n\nSTREAM:\nPlay immediately\nData arrives as you watch\n[==..............] 15% (but already watching)\n\nExamples:\n- Netflix: Video streams as you watch (no full download first)\n- Spotify: Music streams as you listen\n- Twitch/YouTube Live: Data generated AND consumed in real-time\n\nTechnical meaning: Small chunks of data sent continuously over a persistent connection, rather than one big file transfer.","type":"concept"},{"name":"why-remote-storage","key":"public/concepts/computing/why-remote-storage","description":"Why most apps store data remotely instead of locally on your device","content":"WHY APPS STORE DATA REMOTELY (not on your phone)\n\nLocal would be faster for raw read/write, but remote wins because:\n\n1. SYNC ACROSS DEVICES - Instagram works on phone AND laptop. Data must live centrally.\n2. SHARE WITH OTHERS - Your post must appear on friends phones. Cannot do that locally.\n3. SECURITY - Banking data on your phone? If stolen, data exposed. Remote is safer.\n4. STORAGE SIZE - Netflix library cannot fit on your phone. Stream from servers.\n5. REAL-TIME UPDATES - Stock prices, messages, live scores must come from central source.\n6. BACKUP - Phone breaks? Remote data survives. Local data is gone.\n\nWhen LOCAL makes sense:\n- Single-player offline games\n- Notes app that does not sync\n- Downloaded music/videos for offline use\n- Cached data for speed","type":"concept"}]},{"name":"networking","type":"subcategory","icon":"🌐","children":[{"name":"gateway","key":"public/concepts/networking/gateway","description":"What is a gateway and the gateway pattern","content":"A gateway is an entry point that routes traffic. Instead of each client (WhatsApp, Telegram, Discord) connecting to separate ports, they all connect to ONE gateway on ONE port. The gateway handles: (1) accepting connections, (2) authentication, (3) routing messages to the right service, (4) managing multiple sessions. This is cleaner than each service managing its own connections. Common pattern: Nginx, API Gateways, Kubernetes Ingress all work this way.","type":"concept"},{"name":"laptop-must-stay-on","key":"public/concepts/networking/laptop-must-stay-on","description":"Why the host machine must remain powered on for self-hosted agents","content":"For a self-hosted AI assistant, the laptop/server running the gateway and agent must stay powered on and connected to internet. If it sleeps or shuts down, the agent cannot receive or respond to messages. Messages may queue (e.g., WhatsApp holds them) and deliver when the machine comes back online. For reliable 24/7 access, use an always-on device (desktop, home server, or cloud VPS).","type":"concept"},{"name":"multiple-agents-multiple-ports","key":"public/concepts/networking/multiple-agents-multiple-ports","description":"How multiple agents would each have their own gateway and port","content":"Each independent agent system listens on its own port. Example:\n- Port 18789 -> Gateway A -> General Assistant\n- Port 18790 -> Gateway B -> Coding Bot\n- Port 18791 -> Gateway C -> Home Automation Bot\n\nAlternatively, one gateway can route to multiple agents based on context. The pattern scales: different services, different ports. This is fundamental to networked applications.","type":"concept"},{"name":"ports","key":"public/concepts/networking/ports","description":"What are ports and why they are needed","content":"A device has ONE IP address but runs MANY services. Ports differentiate them. Think of IP as a building address, ports as apartment numbers. Port 22 = SSH, Port 80 = web server, Port 443 = HTTPS, etc. When connecting to a service, you need both: the IP (which building) and the port (which apartment). Example: 100.64.1.5:18789 means IP 100.64.1.5, port 18789.","type":"concept"},{"name":"private-ip-problem","key":"public/concepts/networking/private-ip-problem","description":"Why devices are unreachable outside home network","content":"Devices on a home network (WiFi) have private IP addresses like 192.168.1.50. These addresses only work inside that local network. When you leave your house (phone on cellular), you cannot reach your home computer - its private IP is meaningless on the internet. This is why you need a VPN to make devices reachable from anywhere.","type":"concept"},{"name":"self-hosted-agent-architecture","key":"public/concepts/networking/self-hosted-agent-architecture","description":"How VPN, gateway, and agent work together for a self-hosted AI assistant","content":"Architecture for a self-hosted AI assistant accessible from phone anywhere:\n\n1. PHONE sends message (e.g., WhatsApp)\n2. VPN (Tailscale) allows phone to reach laptop from anywhere via stable IP\n3. GATEWAY (listening on a port) receives the message, handles auth, routes it\n4. AGENT (e.g., Clawdbot) processes the message, calls AI API (Claude/OpenAI)\n5. Response flows back the same path to phone\n\nKey insight: VPN solves the FINDING problem (how to reach the laptop). Gateway solves the ROUTING problem (which service on the laptop). Agent does the WORK (talks to AI, executes tools).","type":"concept"},{"name":"visual-architecture-diagram","key":"public/concepts/networking/visual-architecture-diagram","description":"Visual diagram of self-hosted AI assistant architecture","content":"SELF-HOSTED AI ASSISTANT ARCHITECTURE\n=====================================\n\n+-------------------------------------------------------------+\n|                     YOUR PHONE                              |\n|                  (anywhere in world)                        |\n|                                                             |\n|    WhatsApp / Telegram / Discord / Signal                   |\n+------------------------------+------------------------------+\n                         |\n                         v\n+-------------------------------------------------------------+\n|                    VPN (Tailscale)                          |\n|                                                             |\n|   Problem: Phone cannot reach laptop outside home WiFi      |\n|   Solution: Both devices join private network (100.x.x.x)   |\n|   Result: Phone can reach laptop from anywhere              |\n+------------------------------+------------------------------+\n                         |\n                         v\n+-------------------------------------------------------------+\n|              YOUR LAPTOP (must stay on)                     |\n|                                                             |\n|   +-----------------------------------------------------+   |\n|   |              GATEWAY (:18789)                       |   |\n|   |                                                     |   |\n|   |   - Single entry point for all clients              |   |\n|   |   - Handles authentication                          |   |\n|   |   - Routes messages to agent                        |   |\n|   |   - Manages sessions                                |   |\n|   +-------------------------+---------------------------+   |\n|                            |                                |\n|   +------------------------v----------------------------+   |\n|   |                    AGENT                            |   |\n|   |                                                     |   |\n|   |   - Receives your message                           |   |\n|   |   - Calls AI API (Claude/OpenAI)                    |   |\n|   |   - Executes tools (browser, files, etc.)           |   |\n|   |   - Returns response                                |   |\n|   +-------------------------+---------------------------+   |\n+-----------------------------+-------------------------------+\n                             |\n                             v\n+-------------------------------------------------------------+\n|                      AI API                                 |\n|               (Claude / OpenAI servers)                     |\n|                                                             |\n|              Processes prompt, returns response             |\n+-------------------------------------------------------------+","type":"diagram"},{"name":"visual-gateway-pattern","key":"public/concepts/networking/visual-gateway-pattern","description":"Visual diagram comparing messy vs clean gateway pattern","content":"GATEWAY PATTERN: WHY ONE ENTRY POINT IS BETTER\n==============================================\n\nMESSY (without gateway):\n\n    WhatsApp ---> :18789 ---+\n                            |\n    Telegram ---> :18790 ---+---> Agent\n                            |\n    Discord  ---> :18791 ---+\n\n    Problem: Each client needs its own port,\n    own auth logic, own session management.\n\n\nCLEAN (with gateway):\n\n    WhatsApp -------+\n                    |\n    Telegram -------+---> :18789 ---> Gateway ---> Agent\n                    |\n    Discord  -------+\n\n    Solution: One port, one auth system,\n    one place handling all connections.\n\n\nMULTIPLE AGENTS:\n\n    Clients ---> :18789 ---> Gateway A ---> Assistant Bot\n            |\n            +--> :18790 ---> Gateway B ---> Coding Bot\n            |\n            +--> :18791 ---> Gateway C ---> Home Bot\n\n    Each agent system gets its own port.","type":"diagram"},{"name":"visual-ports-analogy","key":"public/concepts/networking/visual-ports-analogy","description":"Visual analogy explaining IP addresses and ports","content":"IP ADDRESS + PORT = COMPLETE ADDRESS\n====================================\n\nANALOGY: Building Address\n\n    IP Address = Street Address (123 Main St)\n    Port       = Apartment Number (Apt 5B)\n\n    123 Main St gets you to the building.\n    Apt 5B gets you to the specific resident.\n\n\nON A COMPUTER:\n\n    +--------------------------------------+\n    |         LAPTOP (100.64.1.5)          |\n    |                                      |\n    |   Port 22    --- SSH (terminal)      |\n    |   Port 80    --- Web server          |\n    |   Port 443   --- HTTPS               |\n    |   Port 5432  --- Database            |\n    |   Port 18789 --- AI Gateway          |\n    |                                      |\n    +--------------------------------------+\n\n    One IP, many services.\n    Port tells you WHICH service.\n\n    Full address: 100.64.1.5:18789\n                  +-- IP --+ +port+","type":"diagram"},{"name":"vpn","key":"public/concepts/networking/vpn","description":"What is a VPN and why it is needed","content":"A VPN (Virtual Private Network) creates a private network across the internet. Tools like Tailscale give each device a stable IP (like 100.x.x.x) that works from anywhere in the world. Your phone and laptop join the same virtual network - they can reach each other whether you are home, at a coffee shop, or in another country. The connection is encrypted end-to-end.","type":"concept"}]}]},{"name":"toolbox","type":"category","icon":"🧰","children":[{"name":"ai-agents","type":"subcategory","icon":"🤖","children":[{"name":"claude-code","key":"public/toolbox/ai-agents/claude-code","description":"AI coding assistant in terminal","content":"CLAUDE CODE\n\nCategory: AI Agents / Coding\nWebsite: https://claude.ai/claude-code\nCost: Requires Claude Pro/Max subscription or API\n\nWhat it does:\nAI coding assistant that runs in your terminal. Can read/write files, run commands, search codebases, and help you build software.\n\nWhen to use:\n- You are coding and want AI help in your terminal\n- You want AI to read and understand your codebase\n- You want AI to make edits across multiple files\n- You want AI to run tests, builds, git commands\n\nDifference from Clawdbot:\n- Claude Code = coding tasks in terminal\n- Clawdbot = general assistant via messaging apps\n\nBoth use Claude (Anthropic) as the AI, just different interfaces and use cases.","type":"tool"},{"name":"clawdbot","key":"public/toolbox/ai-agents/clawdbot","description":"Self-hosted AI assistant via messaging apps","content":"CLAWDBOT\n\nCategory: AI Agents / Self-hosted\nWebsite: https://github.com/clawdbot/clawdbot\nCost: Free (but uses Claude/OpenAI API which has costs)\n\nWhat it does:\nSelf-hosted AI assistant that connects to messaging platforms. Chat with Claude via WhatsApp, Telegram, Discord, Slack, Signal, iMessage.\n\nWhen to use:\n- You want to chat with AI from messaging apps instead of opening a website\n- You want voice interaction with AI\n- You want browser automation from your phone\n- You want persistent context across conversations\n- You want AI in group chats with friends\n\nRequires:\n- A laptop/server that stays on (runs the Gateway)\n- Tailscale or similar for remote access\n- Claude or OpenAI API key\n\nComponents: Gateway (routes messages) + Agent (talks to AI API)","type":"tool"}]},{"name":"devtools","type":"subcategory","icon":"🛠️","children":[{"name":"bun","key":"public/toolbox/devtools/bun","description":"Fast JavaScript runtime and package manager - used for Clawdbot","content":"BUN\n\nCategory: DevTools / JavaScript Runtime + Package Manager\nWebsite: https://bun.sh\nCost: Free and open source\n\nWhat it does:\nAll-in-one JavaScript toolkit. Replaces three separate tools:\n- npm (package manager) --> bun install\n- node (runtime) --> bun run app.js\n- webpack (bundler) --> bun build\n\nWhy its faster than npm:\n- Written in Zig (low-level, fast) vs npm in JavaScript\n- Downloads packages in parallel vs one at a time\n- Aggressive caching\n\nWhen I used it:\nInstalling Clawdbot. \"bun install\" took ~19 seconds for 2,228 packages. With npm this would have been 1-2 minutes.\n\nInstall: curl -fsSL https://bun.sh/install | bash\nAfter install: ~/.bun/bin/bun or add to PATH\n\nTip: Use whatever the project specifies. See package-lock.json? Use npm. See bun.lockb? Use bun.","type":"tool"},{"name":"ghostty","key":"public/toolbox/devtools/ghostty","description":"Modern GPU-accelerated terminal emulator for macOS","content":"GHOSTTY\n\nCategory: Terminal Emulator\nWebsite: https://ghostty.org\nCreator: Mitchell Hashimoto (HashiCorp founder)\nCost: Free, open source\n\nWhat it does:\nA modern, GPU-accelerated terminal emulator. Renders text using your GPU for smooth scrolling and fast output. Written in Zig for native performance.\n\nWhen I used it:\nUsing it with Claude Code instead of macOS Terminal. Noticeably smoother when Claude streams long responses.\n\nWhy it is better than macOS Terminal:\n\n1. GPU-Accelerated Rendering\n   - macOS Terminal uses CPU (can lag with lots of output)\n   - Ghostty uses GPU (buttery smooth)\n\n2. Speed\n   - Written in Zig (compiled to native code, like Bun)\n   - Faster startup, scrolling, everything\n\n3. Native Splits\n   - macOS Terminal: only tabs, no splits (need tmux)\n   - Ghostty: Cmd+D for horizontal, Cmd+Shift+D for vertical\n   - Can divide one window into multiple panes\n\n4. Modern Features\n   - True color support\n   - Font ligatures\n   - Sixel images in terminal\n   - Smart font fallback\n\n5. Native macOS Feel\n   - Unlike Alacritty/Kitty, feels like a proper Mac app\n   - Native menu bar, Cmd+C/V, system notifications\n\n6. Greenfield Advantage\n   - Built 2023-2024 from scratch\n   - Learned from iTerm2, Alacritty, Kitty\n   - No legacy baggage\n\nConfig file: ~/.config/ghostty/config\n\nExample config:\n  font-family = JetBrains Mono\n  font-size = 14\n  theme = catppuccin-mocha","type":"tool"}]},{"name":"knowledge","type":"subcategory","icon":"📚","children":[{"name":"ensue","key":"public/toolbox/knowledge/ensue","description":"Persistent knowledge base for augmented cognition across conversations","content":"ENSUE\n\nCategory: Knowledge Management / Memory\nWebsite: https://www.ensue-network.ai\nCost: Free tier available\n\nWhat it does:\nPersistent knowledge base that works across AI conversations. Store concepts, notes, and learnings that Claude can retrieve in future sessions. Your knowledge compounds over time instead of resetting every conversation.\n\nWhen to use:\n- Building a personal knowledge base of concepts you learn\n- Storing information you want to recall in future conversations\n- Creating a toolbox of software and tools you have used\n- Remembering decisions, preferences, and learnings\n\nHow I use it:\n- public/concepts/ namespace for computing and networking fundamentals\n- public/toolbox/ namespace for software I have actually used\n- Each entry has description, full explanation, and examples\n\nKey insight: Not just storage - its augmented cognition. Future conversations can build on what you already know instead of starting from zero.\n\nIntegrates with: Claude Code via plugin/skill","type":"tool"}]},{"name":"networking","type":"subcategory","icon":"🌐","children":[{"name":"tailscale","key":"public/toolbox/networking/tailscale","description":"VPN tool for connecting devices from anywhere","content":"TAILSCALE\n\nCategory: Networking / VPN\nWebsite: https://tailscale.com\nCost: Free for personal use (up to 100 devices)\n\nWhat it does:\nCreates a private network (mesh VPN) across all your devices. Each device gets a stable IP (100.x.x.x) that works from anywhere in the world.\n\nWhen to use:\n- You want your phone to reach your laptop from anywhere\n- You are self-hosting services and need remote access\n- You want secure connections without exposing ports to the internet\n- You need devices to talk to each other across different networks\n\nAlternatives: WireGuard (manual setup), ZeroTier, Cloudflare WARP\n\nExample use case:\nRunning Clawdbot on your laptop and accessing it from your phone via WhatsApp while traveling.","type":"tool"}]}]}]};
+        const graphData = {"nodes":[{"id":"concepts","name":"concepts","type":"category","size":45},{"id":"toolbox","name":"toolbox","type":"category","size":45},{"id":"concepts/computing","name":"computing","type":"subcategory","category":"concepts","size":32},{"id":"toolbox/devtools","name":"devtools","type":"subcategory","category":"toolbox","size":32},{"id":"concepts/networking","name":"networking","type":"subcategory","category":"concepts","size":32},{"id":"toolbox/networking","name":"networking","type":"subcategory","category":"toolbox","size":32},{"id":"toolbox/ai-agents","name":"ai-agents","type":"subcategory","category":"toolbox","size":32},{"id":"toolbox/knowledge","name":"knowledge","type":"subcategory","category":"toolbox","size":32},{"id":"public/concepts/computing/shell-compatibility-in-docs","name":"shell-compatibility-in-docs","fullName":"public/concepts/computing/shell-compatibility-in-docs","description":"When to care about bash vs zsh when reading or writing documentation","content":"SHELL COMPATIBILITY IN DOCS\n\nWHEN READING DOCS\n90 percent of the time: just run the commands. Basic commands work everywhere:\ncd, ls, git clone, npm install, export VAR=value\n\nThese work in sh, bash, zsh, fish - all of them.\n\nWATCH OUT FOR\n- fish has different syntax (set -x VAR instead of export VAR=)\n- If something fails, search for command plus your shell name\n- Advanced syntax might be bash/zsh only\n\nWHEN WRITING DOCS\nJust write the commands. Do not specify a shell.\n\nGood:\n  git clone URL\n  cd repo\n  bun install\n\nUnnecessary:\n  Installation for bash/zsh\n\nONLY MENTION SHELL WHEN\n1. Teaching shell scripting - show the shebang line\n2. Config files - mention both ~/.zshrc and ~/.bashrc\n3. Using syntax that might not work everywhere\n\nTL;DR\n- Reading docs: just run it, probably works\n- Writing docs: do not mention shell unless it matters\n- Config files: mention both zshrc and bashrc","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/shell-scripts","name":"shell-scripts","fullName":"public/concepts/computing/shell-scripts","description":"What shell scripts are and when to use them","content":"SHELL SCRIPTS\n\nA shell script is a text file containing commands that run in sequence. Instead of typing commands one by one, save them in a file and run all at once.\n\nBASIC EXAMPLE\nFile: setup.sh\n\n#!/bin/bash\necho Setting up...\nmkdir my-project\ncd my-project\ngit init\necho Done!\n\nRun it:\nchmod +x setup.sh    # Make executable once\n./setup.sh           # Run it\n\nTHE SHEBANG (first line)\n#!/bin/bash - Use bash\n#!/bin/zsh - Use zsh\n#!/bin/sh - Use basic sh (most compatible)\n\nTells the system which shell runs the script.\n\nCOMMON PATTERNS\n\nVariables:\nNAME=Christine\necho Hello $NAME\n\nArguments:\n$1 = first argument passed in\n$2 = second argument\n\nWHEN TO USE SHELL SCRIPTS\nGood for: running commands in sequence, automating tasks, build scripts, gluing programs together.\n\nUse a real language for: complex logic, error handling, data processing.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/terminal-vs-shell","name":"terminal-vs-shell","fullName":"public/concepts/computing/terminal-vs-shell","description":"The difference between terminal emulators and shells","content":"TERMINAL VS SHELL\n\nTwo different things that work together.\n\nTERMINAL (Terminal Emulator)\nThe window/app that displays text.\nHandles: fonts, colors, keyboard input, rendering, splits, tabs.\nExamples: Ghostty, macOS Terminal, iTerm2\n\nSHELL\nThe program running INSIDE the terminal.\nInterprets your commands and executes them.\nExamples: zsh, bash, fish, sh\n\nANALOGY\nTerminal = TV screen\nShell = The show playing on it\n\nYou can run different shells in the same terminal, or the same shell in different terminals.\n\nCOMMON SHELLS\nsh (1979) - The grandfather, super basic\nbash (1989) - Reliable workhorse, Linux default\nzsh (1990) - macOS default since 2019, bash plus nicer features\nfish (2005) - Modern, friendly, intentionally different syntax\n\nFor daily use, they are mostly the same. Basic commands (cd, ls, git, bun) work in all of them.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/toolbox/devtools/ghostty","name":"ghostty","fullName":"public/toolbox/devtools/ghostty","description":"Modern GPU-accelerated terminal emulator for macOS","content":"GHOSTTY\n\nCategory: Terminal Emulator\nWebsite: https://ghostty.org\nCreator: Mitchell Hashimoto (HashiCorp founder)\nCost: Free, open source\n\nWhat it does:\nA modern, GPU-accelerated terminal emulator. Renders text using your GPU for smooth scrolling and fast output. Written in Zig for native performance.\n\nWhen I used it:\nUsing it with Claude Code instead of macOS Terminal. Noticeably smoother when Claude streams long responses.\n\nWhy it is better than macOS Terminal:\n\n1. GPU-Accelerated Rendering\n   - macOS Terminal uses CPU (can lag with lots of output)\n   - Ghostty uses GPU (buttery smooth)\n\n2. Speed\n   - Written in Zig (compiled to native code, like Bun)\n   - Faster startup, scrolling, everything\n\n3. Native Splits\n   - macOS Terminal: only tabs, no splits (need tmux)\n   - Ghostty: Cmd+D for horizontal, Cmd+Shift+D for vertical\n   - Can divide one window into multiple panes\n\n4. Modern Features\n   - True color support\n   - Font ligatures\n   - Sixel images in terminal\n   - Smart font fallback\n\n5. Native macOS Feel\n   - Unlike Alacritty/Kitty, feels like a proper Mac app\n   - Native menu bar, Cmd+C/V, system notifications\n\n6. Greenfield Advantage\n   - Built 2023-2024 from scratch\n   - Learned from iTerm2, Alacritty, Kitty\n   - No legacy baggage\n\nConfig file: ~/.config/ghostty/config\n\nExample config:\n  font-family = JetBrains Mono\n  font-size = 14\n  theme = catppuccin-mocha","type":"tool","category":"toolbox","subcategory":"devtools","size":18},{"id":"public/concepts/computing/tls-vs-e2ee","name":"tls-vs-e2ee","fullName":"public/concepts/computing/tls-vs-e2ee","description":"Difference between TLS (transport encryption) and end-to-end encryption","content":"TLS VS END-TO-END ENCRYPTION\n\nTwo different types of encryption that protect different things.\n\nTLS (Transport Layer Security) - what HTTPS uses:\n\nYou  <───encrypted───>  Server\n         (TLS)            ↓\n                    Server decrypts,\n                    reads your request,\n                    processes it\n\n- Protects data IN TRANSIT (your ISP, wifi hackers can't snoop)\n- Server CAN read your data (it must, to serve you)\n- Used for: websites, APIs, any HTTPS connection\n\nEnd-to-End Encryption (E2EE) - what Signal uses:\n\nYou  <───encrypted───>  Server  <───encrypted───>  Friend\n                          ↓\n                   Server CANNOT read\n                   (only passes encrypted blob)\n\n- Even the server in the middle can't decrypt\n- Only the endpoints (you and recipient) have the keys\n- Used for: private messaging, password managers\n\nKEY INSIGHT\n- TLS = \"nobody between us can read this\"\n- E2EE = \"nobody except us can read this, not even the service provider\"\n\nWHY IT MATTERS\n- If Amazon gets hacked, they have your data (TLS protected transit, not storage)\n- If Signal gets hacked, attackers get encrypted blobs they can't read","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/e2ee-trust-model","name":"e2ee-trust-model","fullName":"public/concepts/computing/e2ee-trust-model","description":"How we can verify that E2EE services like Signal don't have our keys","content":"E2EE TRUST MODEL\n\nHow do we know Signal/WhatsApp don't have our encryption keys?\n\n1. KEYS GENERATED ON YOUR DEVICE\n\nYour Phone                    Signal Server\n──────────                    ─────────────\nGenerates:\n  - Private key (SECRET)  →   never sent\n  - Public key            →   uploaded (so others can encrypt TO you)\n\nSignal never sees your private key - it's born on your phone and stays there.\n\n2. OPEN SOURCE CODE\n\nSignal's code is public on GitHub. Security researchers:\n- Read exactly what the app does\n- Verify keys are generated locally\n- Verify private keys aren't transmitted\n- Check for backdoors\n\nThousands of cryptographers have audited it.\n\n3. PUBLIC CRYPTOGRAPHY\n\nSignal Protocol is published. Anyone can verify:\n- The math is sound\n- The implementation matches the spec\n- There's no way to decrypt without the private key\n\n4. REPRODUCIBLE BUILDS\n\nYou can compile Signal's source code yourself and verify it produces\nthe exact same app in the App Store. Proves no hidden backdoors.\n\nTHE TRUST SPECTRUM\n\nFull trust required    <──────────────────>    Verifiable\n\n     WhatsApp                 Signal              Bitcoin\n        │                       │                    │\n   Closed source          Open source          Open source\n   \"Trust us\"             Audited code         + decentralized\n   Meta owns it           Non-profit           No single owner\n\nWHATSAPP CAVEAT\nClaims E2EE using Signal Protocol, but:\n- Code is closed source (can't verify)\n- Owned by Meta (incentive to collect data)\n- You have to trust their claim\n\nTHE HONEST ANSWER\nEven with Signal, you trust:\n- The app matches the open source code\n- Your phone's OS isn't compromised\n- No unknown flaw in the cryptography\n\nBut it's VERIFIABLE trust - experts CAN check it, unlike \"just trust us.\"","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/legacy-vs-greenfield","name":"legacy-vs-greenfield","fullName":"public/concepts/computing/legacy-vs-greenfield","description":"Why new software built from scratch is often more efficient than legacy software","content":"LEGACY VS GREENFIELD SOFTWARE\n\nWhy new tools are often faster than established ones.\n\nTHE LEGACY PROBLEM\nSoftware built years ago accumulates:\n- Old code paths that can't be removed (backwards compatibility)\n- Workarounds for problems that no longer exist\n- Architecture decisions that made sense then but are suboptimal now\n- Layers of abstraction built on other layers\n\nTHE GREENFIELD ADVANTAGE\nStarting fresh means you can:\n- Learn from predecessors' mistakes\n- Design architecture knowing modern patterns upfront\n- Choose better languages/tools available now\n- Skip backwards compatibility, support only current standards\n- Integrate features that were bolted on later\n\nEXAMPLES\n| Legacy          | Greenfield Replacement      |\n|-----------------|-----------------------------|                   \n| npm             | Bun, pnpm                   |\n| Webpack         | Vite, esbuild               |\n| REST APIs       | GraphQL                     |\n| Create React App| Vite, Next.js               |\n\nTHE TRADEOFF\nLegacy: stability, huge ecosystem, battle-tested edge cases\nGreenfield: faster, cleaner, but may have gaps and less community support\n\nBun vs npm is a textbook example: npm built in 2010 in JavaScript, Bun built in 2022 in Zig with 12 years of hindsight.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/networking/gateway","name":"gateway","fullName":"public/concepts/networking/gateway","description":"What is a gateway and the gateway pattern","content":"A gateway is an entry point that routes traffic. Instead of each client (WhatsApp, Telegram, Discord) connecting to separate ports, they all connect to ONE gateway on ONE port. The gateway handles: (1) accepting connections, (2) authentication, (3) routing messages to the right service, (4) managing multiple sessions. This is cleaner than each service managing its own connections. Common pattern: Nginx, API Gateways, Kubernetes Ingress all work this way.","type":"concept","category":"concepts","subcategory":"networking","size":18},{"id":"public/concepts/networking/ports","name":"ports","fullName":"public/concepts/networking/ports","description":"What are ports and why they are needed","content":"A device has ONE IP address but runs MANY services. Ports differentiate them. Think of IP as a building address, ports as apartment numbers. Port 22 = SSH, Port 80 = web server, Port 443 = HTTPS, etc. When connecting to a service, you need both: the IP (which building) and the port (which apartment). Example: 100.64.1.5:18789 means IP 100.64.1.5, port 18789.","type":"concept","category":"concepts","subcategory":"networking","size":18},{"id":"public/concepts/networking/private-ip-problem","name":"private-ip-problem","fullName":"public/concepts/networking/private-ip-problem","description":"Why devices are unreachable outside home network","content":"Devices on a home network (WiFi) have private IP addresses like 192.168.1.50. These addresses only work inside that local network. When you leave your house (phone on cellular), you cannot reach your home computer - its private IP is meaningless on the internet. This is why you need a VPN to make devices reachable from anywhere.","type":"concept","category":"concepts","subcategory":"networking","size":18},{"id":"public/concepts/networking/vpn","name":"vpn","fullName":"public/concepts/networking/vpn","description":"What is a VPN and why it is needed","content":"A VPN (Virtual Private Network) creates a private network across the internet. Tools like Tailscale give each device a stable IP (like 100.x.x.x) that works from anywhere in the world. Your phone and laptop join the same virtual network - they can reach each other whether you are home, at a coffee shop, or in another country. The connection is encrypted end-to-end.","type":"concept","category":"concepts","subcategory":"networking","size":18},{"id":"public/concepts/networking/laptop-must-stay-on","name":"laptop-must-stay-on","fullName":"public/concepts/networking/laptop-must-stay-on","description":"Why the host machine must remain powered on for self-hosted agents","content":"For a self-hosted AI assistant, the laptop/server running the gateway and agent must stay powered on and connected to internet. If it sleeps or shuts down, the agent cannot receive or respond to messages. Messages may queue (e.g., WhatsApp holds them) and deliver when the machine comes back online. For reliable 24/7 access, use an always-on device (desktop, home server, or cloud VPS).","type":"concept","category":"concepts","subcategory":"networking","size":18},{"id":"public/concepts/networking/multiple-agents-multiple-ports","name":"multiple-agents-multiple-ports","fullName":"public/concepts/networking/multiple-agents-multiple-ports","description":"How multiple agents would each have their own gateway and port","content":"Each independent agent system listens on its own port. Example:\n- Port 18789 -> Gateway A -> General Assistant\n- Port 18790 -> Gateway B -> Coding Bot\n- Port 18791 -> Gateway C -> Home Automation Bot\n\nAlternatively, one gateway can route to multiple agents based on context. The pattern scales: different services, different ports. This is fundamental to networked applications.","type":"concept","category":"concepts","subcategory":"networking","size":18},{"id":"public/concepts/computing/common-services-overview","name":"common-services-overview","fullName":"public/concepts/computing/common-services-overview","description":"Overview of common network services and their ports","content":"COMMON SERVICES AND THEIR PORTS\n\nPort 22 - SSH (Secure Shell)\nRemote terminal access. Type commands on your laptop, they run on another computer. Like a remote keyboard for servers.\n\nPort 80 - HTTP\nUnencrypted web traffic. Old/obsolete. Anyone watching network can see data.\n\nPort 443 - HTTPS\nEncrypted web traffic. Modern standard. Safe for passwords, banking. The padlock icon.\n\nPort 5432 - PostgreSQL\nPort 3306 - MySQL\nPort 27017 - MongoDB\nDatabase servers. Where apps store data permanently. Different software, same purpose - like Word vs Google Docs.\n\nPort 6379 - Redis\nFast cache in RAM (not disk). Server-side temporary data. \"Is user logged in?\" \"Cached stock price.\" Microseconds vs milliseconds.\n\nPort 3000 - Dev Server\nLocal development. Run your code on your own machine, test at localhost:3000 before deploying to real server.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/client-server-architecture","name":"client-server-architecture","fullName":"public/concepts/computing/client-server-architecture","description":"How apps and browsers are just UI clients to servers","content":"CLIENT-SERVER ARCHITECTURE\n\nCLIENT = asks for things (your phone, browser, app)\nSERVER = provides things (company servers, databases)\n\nKey insight: APPS ARE JUST UI. Like browsers, apps just:\n- Show buttons, images, text\n- Collect your taps and input\n- Send requests to server\n- Display responses\n\nThe REAL STUFF (logic, data, authentication, payments) happens on the company servers. Your app is a fancy remote control.\n\nExamples:\n- Browser -> displays HTML from servers\n- Instagram app -> displays UI/data from Instagram servers\n- Banking app -> just UI, all money logic is on bank servers","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/networking/visual-ports-analogy","name":"visual-ports-analogy","fullName":"public/concepts/networking/visual-ports-analogy","description":"Visual analogy explaining IP addresses and ports","content":"IP ADDRESS + PORT = COMPLETE ADDRESS\n====================================\n\nANALOGY: Building Address\n\n    IP Address = Street Address (123 Main St)\n    Port       = Apartment Number (Apt 5B)\n\n    123 Main St gets you to the building.\n    Apt 5B gets you to the specific resident.\n\n\nON A COMPUTER:\n\n    +--------------------------------------+\n    |         LAPTOP (100.64.1.5)          |\n    |                                      |\n    |   Port 22    --- SSH (terminal)      |\n    |   Port 80    --- Web server          |\n    |   Port 443   --- HTTPS               |\n    |   Port 5432  --- Database            |\n    |   Port 18789 --- AI Gateway          |\n    |                                      |\n    +--------------------------------------+\n\n    One IP, many services.\n    Port tells you WHICH service.\n\n    Full address: 100.64.1.5:18789\n                  +-- IP --+ +port+","type":"diagram","category":"concepts","subcategory":"networking","size":18},{"id":"public/concepts/networking/visual-gateway-pattern","name":"visual-gateway-pattern","fullName":"public/concepts/networking/visual-gateway-pattern","description":"Visual diagram comparing messy vs clean gateway pattern","content":"GATEWAY PATTERN: WHY ONE ENTRY POINT IS BETTER\n==============================================\n\nMESSY (without gateway):\n\n    WhatsApp ---> :18789 ---+\n                            |\n    Telegram ---> :18790 ---+---> Agent\n                            |\n    Discord  ---> :18791 ---+\n\n    Problem: Each client needs its own port,\n    own auth logic, own session management.\n\n\nCLEAN (with gateway):\n\n    WhatsApp -------+\n                    |\n    Telegram -------+---> :18789 ---> Gateway ---> Agent\n                    |\n    Discord  -------+\n\n    Solution: One port, one auth system,\n    one place handling all connections.\n\n\nMULTIPLE AGENTS:\n\n    Clients ---> :18789 ---> Gateway A ---> Assistant Bot\n            |\n            +--> :18790 ---> Gateway B ---> Coding Bot\n            |\n            +--> :18791 ---> Gateway C ---> Home Bot\n\n    Each agent system gets its own port.","type":"diagram","category":"concepts","subcategory":"networking","size":18},{"id":"public/concepts/networking/visual-architecture-diagram","name":"visual-architecture-diagram","fullName":"public/concepts/networking/visual-architecture-diagram","description":"Visual diagram of self-hosted AI assistant architecture","content":"SELF-HOSTED AI ASSISTANT ARCHITECTURE\n=====================================\n\n+-------------------------------------------------------------+\n|                     YOUR PHONE                              |\n|                  (anywhere in world)                        |\n|                                                             |\n|    WhatsApp / Telegram / Discord / Signal                   |\n+------------------------------+------------------------------+\n                         |\n                         v\n+-------------------------------------------------------------+\n|                    VPN (Tailscale)                          |\n|                                                             |\n|   Problem: Phone cannot reach laptop outside home WiFi      |\n|   Solution: Both devices join private network (100.x.x.x)   |\n|   Result: Phone can reach laptop from anywhere              |\n+------------------------------+------------------------------+\n                         |\n                         v\n+-------------------------------------------------------------+\n|              YOUR LAPTOP (must stay on)                     |\n|                                                             |\n|   +-----------------------------------------------------+   |\n|   |              GATEWAY (:18789)                       |   |\n|   |                                                     |   |\n|   |   - Single entry point for all clients              |   |\n|   |   - Handles authentication                          |   |\n|   |   - Routes messages to agent                        |   |\n|   |   - Manages sessions                                |   |\n|   +-------------------------+---------------------------+   |\n|                            |                                |\n|   +------------------------v----------------------------+   |\n|   |                    AGENT                            |   |\n|   |                                                     |   |\n|   |   - Receives your message                           |   |\n|   |   - Calls AI API (Claude/OpenAI)                    |   |\n|   |   - Executes tools (browser, files, etc.)           |   |\n|   |   - Returns response                                |   |\n|   +-------------------------+---------------------------+   |\n+-----------------------------+-------------------------------+\n                             |\n                             v\n+-------------------------------------------------------------+\n|                      AI API                                 |\n|               (Claude / OpenAI servers)                     |\n|                                                             |\n|              Processes prompt, returns response             |\n+-------------------------------------------------------------+","type":"diagram","category":"concepts","subcategory":"networking","size":18},{"id":"public/concepts/computing/ports-listening-vs-connecting","name":"ports-listening-vs-connecting","fullName":"public/concepts/computing/ports-listening-vs-connecting","description":"Understanding when ports are used - servers listen, clients connect","content":"PORTS: LISTENING VS CONNECTING\n\nYour laptop has 65,535 ports, but most have NOTHING LISTENING.\n\nWhen you VISIT a website (you are the client):\n- Amazon server listens on port 443\n- Your laptop connects FROM a random port TO their 443\n- You are not listening on 443 - they are\n\nWhen you RUN Clawdbot (you are the server):\n- Your laptop listens on port 18789\n- Your phone connects TO your 18789\n- Now you are the server\n\nPorts are like phone extensions:\n- A company has extensions 101, 102, 103\n- If no one is assigned to extension 105, calls to 105 go nowhere\n- Only ports with programs listening will respond\n\nIf you are not running server software, your ports 22, 80, 443, 5432 etc. are all silent - nothing is listening.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/networking/self-hosted-agent-architecture","name":"self-hosted-agent-architecture","fullName":"public/concepts/networking/self-hosted-agent-architecture","description":"How VPN, gateway, and agent work together for a self-hosted AI assistant","content":"Architecture for a self-hosted AI assistant accessible from phone anywhere:\n\n1. PHONE sends message (e.g., WhatsApp)\n2. VPN (Tailscale) allows phone to reach laptop from anywhere via stable IP\n3. GATEWAY (listening on a port) receives the message, handles auth, routes it\n4. AGENT (e.g., Clawdbot) processes the message, calls AI API (Claude/OpenAI)\n5. Response flows back the same path to phone\n\nKey insight: VPN solves the FINDING problem (how to reach the laptop). Gateway solves the ROUTING problem (which service on the laptop). Agent does the WORK (talks to AI, executes tools).","type":"concept","category":"concepts","subcategory":"networking","size":18},{"id":"public/concepts/computing/what-is-a-server","name":"what-is-a-server","fullName":"public/concepts/computing/what-is-a-server","description":"Definition of a server - it is a role, not special hardware","content":"A SERVER is just a computer that provides a service to other computers. The word describes its ROLE, not its hardware.\n\nYour laptop can be a server.\nA $50 Raspberry Pi can be a server.\nA $10,000 machine in a data center can be a server.\n\nIf your laptop runs a web server program, it becomes a web server. If it runs Clawdbot Gateway, it becomes a message server. The moment you run software that LISTENS for incoming connections and SERVES responses, you have a server.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/why-remote-storage","name":"why-remote-storage","fullName":"public/concepts/computing/why-remote-storage","description":"Why most apps store data remotely instead of locally on your device","content":"WHY APPS STORE DATA REMOTELY (not on your phone)\n\nLocal would be faster for raw read/write, but remote wins because:\n\n1. SYNC ACROSS DEVICES - Instagram works on phone AND laptop. Data must live centrally.\n2. SHARE WITH OTHERS - Your post must appear on friends phones. Cannot do that locally.\n3. SECURITY - Banking data on your phone? If stolen, data exposed. Remote is safer.\n4. STORAGE SIZE - Netflix library cannot fit on your phone. Stream from servers.\n5. REAL-TIME UPDATES - Stock prices, messages, live scores must come from central source.\n6. BACKUP - Phone breaks? Remote data survives. Local data is gone.\n\nWhen LOCAL makes sense:\n- Single-player offline games\n- Notes app that does not sync\n- Downloaded music/videos for offline use\n- Cached data for speed","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/databases-explained","name":"databases-explained","fullName":"public/concepts/computing/databases-explained","description":"What databases are and where data is stored","content":"DATABASES - Where App Data Lives\n\nDatabases store data permanently. They listen on a port, apps connect and query.\n\nTypical architecture:\n\n[Your Phone]  ->  [Company Server]  ->  [Database Server]\n   (app UI)       (app logic)          (data storage)\n\nExample - Instagram:\n- Your phone has Instagram APP (just interface)\n- Instagram SERVERS run code that handles requests\n- Instagram DATABASE stores photos, users, likes\n\nWhen you post a photo:\n1. Phone uploads to Instagram server\n2. Server saves photo + records in database\n3. Database is on INSTAGRAM machines, not your phone\n\nPostgreSQL, MySQL, MongoDB = different database software. Same purpose, different products. Like Word vs Google Docs vs Pages for documents.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/how-browsers-find-websites","name":"how-browsers-find-websites","fullName":"public/concepts/computing/how-browsers-find-websites","description":"DNS lookup and how browsers connect to web servers","content":"HOW BROWSERS FIND WEBSITES\n\nWhen you type https://amazon.com:\n\n1. Browser asks DNS: \"What IP is amazon.com?\"\n   DNS answers: \"176.32.103.205\"\n\n2. Browser connects to 176.32.103.205:443\n   (IP address + port 443 for HTTPS)\n\n3. Amazon server sends back HTML/CSS/JS\n\n4. Your browser renders it on screen\n\nDNS = Domain Name System = the phonebook of the internet. Translates human-readable names (google.com) to machine-readable IPs (142.250.80.46).\n\nEVERY HTTPS website uses port 443. The DOMAIN NAME determines which server. The PORT determines which service on that server.\n\nhttps://amazon.com  -> Amazon IP, port 443\nhttps://google.com  -> Google IP, port 443\nhttps://mysite.com  -> My server IP, port 443","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/visual-client-server-diagram","name":"visual-client-server-diagram","fullName":"public/concepts/computing/visual-client-server-diagram","description":"Visual diagram showing apps as UI clients to servers","content":"VISUAL: APPS ARE JUST UI (Client-Server)\n=========================================\n\n+-------------------------------------------------------------+\n|                        YOUR PHONE                           |\n|                                                             |\n|   +-----------------------------------------------------+   |\n|   |                    APP (Client)                     |   |\n|   |                                                     |   |\n|   |   - Shows buttons, images, text                     |   |\n|   |   - Collects your taps and input                    |   |\n|   |   - Sends requests to server                        |   |\n|   |   - Displays responses                              |   |\n|   |                                                     |   |\n|   |   Basically: FANCY REMOTE CONTROL                   |   |\n|   +-----------------------------------------------------+   |\n+-------------------------------------------------------------+\n                              |\n                              v\n+-------------------------------------------------------------+\n|                     COMPANY SERVERS                         |\n|                                                             |\n|   - Runs the actual logic                                   |\n|   - Authenticates you                                       |\n|   - Queries database                                        |\n|   - Processes payments                                      |\n|   - Enforces rules                                          |\n|                                                             |\n|   THE REAL STUFF HAPPENS HERE                               |\n+-------------------------------------------------------------+\n                              |\n                              v\n+-------------------------------------------------------------+\n|                       DATABASE                              |\n|                                                             |\n|   - Stores all data permanently                             |\n|   - Users, posts, orders, everything                        |\n+-------------------------------------------------------------+","type":"diagram","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/ssh-explained","name":"ssh-explained","fullName":"public/concepts/computing/ssh-explained","description":"What SSH is and when you would use it","content":"SSH (Secure Shell) - Port 22\n\nRemote terminal access to another computer.\n\nYour laptop                         Remote server\n    |                                   |\n    |   \"ls -la\" ---------------------> | runs command\n    |                                   |\n    | <--------------------- file listing   |\n\nUse cases:\n- You have a server in a data center. SSH in to update software, check logs, restart services.\n- You are at a coffee shop, need to run commands on home server.\n- Deploying code to production server.\n\nSSH is encrypted - safe over public WiFi. Like having a secure remote keyboard to any computer in the world.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/redis-explained","name":"redis-explained","fullName":"public/concepts/computing/redis-explained","description":"What Redis is - server-side cache for speed","content":"REDIS - Fast Server-Side Cache (Port 6379)\n\nRedis stores temporary data in RAM for speed. It lives on the SERVER side, not your browser.\n\nWhy not just use the database?\n- Database (PostgreSQL): stored on disk -> slower (milliseconds)\n- Redis: stored in RAM -> faster (microseconds)\n\nUse cases:\n- \"Is user #123 logged in?\" (session data)\n- \"What is current Bitcoin price?\" (cached for 10 seconds)\n- \"Rate limiting: has this IP made >100 requests this minute?\"\n\nNOT for:\n- Browser back-button cache (that is browser memory, not Redis)\n- Permanent data (Redis is temporary, can be lost on restart)\n\nThink of Redis as short-term memory for servers. Fast access to frequently-needed info without hitting the slow database every time.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/dev-server-explained","name":"dev-server-explained","fullName":"public/concepts/computing/dev-server-explained","description":"What a dev server is - local development environment","content":"DEV SERVER - Local Development (often Port 3000)\n\nA dev server runs your code locally on your laptop so you can test it.\n\nWorkflow:\n1. You write code\n2. Dev server runs it on your machine\n3. You open localhost:3000 in browser\n4. You see your website, test it, make changes\n\n\"localhost\" = your own computer\n\"localhost:3000\" = port 3000 on your own machine\n\nThe dev server:\n- Runs your code\n- Watches for file changes\n- Reloads automatically when you edit\n- Only accessible from YOUR computer (not the internet)\n\nWhen ready to go live, you DEPLOY to a real server that is accessible to everyone. Dev server is just for testing.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/mental-model-summary","name":"mental-model-summary","fullName":"public/concepts/computing/mental-model-summary","description":"Big picture mental model tying client-server concepts together","content":"MENTAL MODEL: THE BIG PICTURE\n=============================\n\n1. SERVERS are just computers that LISTEN and SERVE.\n   Any computer can be a server if it runs server software.\n\n2. CLIENTS are computers that CONNECT and REQUEST.\n   Your phone, browser, apps are clients.\n\n3. PORTS differentiate services on one machine.\n   IP = which building. Port = which apartment.\n\n4. APPS ARE JUST UI.\n   Real logic, data, security runs on company servers.\n   Your app is a fancy remote control.\n\n5. DATABASES live on servers, not your phone.\n   Apps send data to remote databases for storage.\n\n6. When YOU run Clawdbot, YOU become a server.\n   Your laptop listens on a port. Your phone connects to it.\n   Role reversal: now you are serving, not just consuming.\n\nThe internet is just computers listening on ports and other computers connecting to them. That is the whole thing.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/what-is-streaming","name":"what-is-streaming","fullName":"public/concepts/computing/what-is-streaming","description":"What streaming means - receiving data continuously in real-time","content":"STREAMING = receiving data continuously in real-time, not downloading all at once.\n\nDOWNLOAD:\nWait... wait... wait...\n[================] 100%\nNOW you can watch\n\nSTREAM:\nPlay immediately\nData arrives as you watch\n[==..............] 15% (but already watching)\n\nExamples:\n- Netflix: Video streams as you watch (no full download first)\n- Spotify: Music streams as you listen\n- Twitch/YouTube Live: Data generated AND consumed in real-time\n\nTechnical meaning: Small chunks of data sent continuously over a persistent connection, rather than one big file transfer.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/rendering-gpu-vs-cpu","name":"rendering-gpu-vs-cpu","fullName":"public/concepts/computing/rendering-gpu-vs-cpu","description":"What renders web pages and apps - GPU vs CPU roles","content":"RENDERING: GPU VS CPU\n\nBoth are used, but different tasks:\n\nCPU handles:\n- HTML/CSS parsing (reading and understanding code)\n- Layout calculation (where does each element go?)\n- Text rendering\n- JavaScript execution\n- Basic graphics\n\nGPU handles (hardware acceleration):\n- Heavy animations\n- Video playback\n- 3D graphics (WebGL, games)\n- Smooth scrolling\n- Visual effects\n\nModern browsers offload visual work to GPU when possible. But a basic webpage works fine with just CPU. GPU makes things smoother and faster for graphics-heavy content.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/visual-ports-listening","name":"visual-ports-listening","fullName":"public/concepts/computing/visual-ports-listening","description":"Visual diagram showing when ports are listening vs not","content":"VISUAL: PORTS - LISTENING VS NOT LISTENING\n===========================================\n\nYOUR LAPTOP (as normal user - not running servers):\n\n    Port 22    --- (silence) nobody listening\n    Port 80    --- (silence) nobody listening\n    Port 443   --- (silence) nobody listening\n    Port 5432  --- (silence) nobody listening\n\n    You CONNECT to other servers. Nothing connects to you.\n\n\nYOUR LAPTOP (running Clawdbot):\n\n    Port 22    --- (silence)\n    Port 80    --- (silence)\n    Port 443   --- (silence)\n    Port 18789 --- CLAWDBOT LISTENING <-- phone connects here\n\n    Now you are a server. You LISTEN for connections.\n\n\nAMAZON SERVER:\n\n    Port 443   --- WEB SERVER LISTENING <-- millions of browsers connect\n    Port 5432  --- DATABASE LISTENING <-- their app servers connect\n    Port 22    --- SSH LISTENING <-- their engineers connect\n\n    They are a server. They LISTEN for connections.","type":"diagram","category":"concepts","subcategory":"computing","size":18},{"id":"public/toolbox/networking/tailscale","name":"tailscale","fullName":"public/toolbox/networking/tailscale","description":"VPN tool for connecting devices from anywhere","content":"TAILSCALE\n\nCategory: Networking / VPN\nWebsite: https://tailscale.com\nCost: Free for personal use (up to 100 devices)\n\nWhat it does:\nCreates a private network (mesh VPN) across all your devices. Each device gets a stable IP (100.x.x.x) that works from anywhere in the world.\n\nWhen to use:\n- You want your phone to reach your laptop from anywhere\n- You are self-hosting services and need remote access\n- You want secure connections without exposing ports to the internet\n- You need devices to talk to each other across different networks\n\nAlternatives: WireGuard (manual setup), ZeroTier, Cloudflare WARP\n\nExample use case:\nRunning Clawdbot on your laptop and accessing it from your phone via WhatsApp while traveling.","type":"tool","category":"toolbox","subcategory":"networking","size":18},{"id":"public/concepts/computing/frontend-vs-backend","name":"frontend-vs-backend","fullName":"public/concepts/computing/frontend-vs-backend","description":"What is front-end vs back-end and what languages are used","content":"FRONT-END VS BACK-END\n\nFRONT-END (client-side):\n- What you see and touch\n- Runs on YOUR device\n- Languages: HTML, CSS, JavaScript, TypeScript\n- Frameworks: React, Vue, Angular\n- Mobile: Swift (iOS), Kotlin (Android), Flutter, React Native\n\nBACK-END (server-side):\n- What you do not see\n- Runs on THEIR servers\n- Languages: Python, Java, Go, Rust, Node.js, Ruby\n- Handles: Databases, APIs, authentication, payments, business logic\n\nApps on your phone are mostly front-end. They talk to back-end servers for data and logic. The app is the UI, the server is the brain.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/toolbox/ai-agents/claude-code","name":"claude-code","fullName":"public/toolbox/ai-agents/claude-code","description":"AI coding assistant in terminal","content":"CLAUDE CODE\n\nCategory: AI Agents / Coding\nWebsite: https://claude.ai/claude-code\nCost: Requires Claude Pro/Max subscription or API\n\nWhat it does:\nAI coding assistant that runs in your terminal. Can read/write files, run commands, search codebases, and help you build software.\n\nWhen to use:\n- You are coding and want AI help in your terminal\n- You want AI to read and understand your codebase\n- You want AI to make edits across multiple files\n- You want AI to run tests, builds, git commands\n\nDifference from Clawdbot:\n- Claude Code = coding tasks in terminal\n- Clawdbot = general assistant via messaging apps\n\nBoth use Claude (Anthropic) as the AI, just different interfaces and use cases.","type":"tool","category":"toolbox","subcategory":"ai-agents","size":18},{"id":"public/toolbox/ai-agents/clawdbot","name":"clawdbot","fullName":"public/toolbox/ai-agents/clawdbot","description":"Self-hosted AI assistant via messaging apps","content":"CLAWDBOT\n\nCategory: AI Agents / Self-hosted\nWebsite: https://github.com/clawdbot/clawdbot\nCost: Free (but uses Claude/OpenAI API which has costs)\n\nWhat it does:\nSelf-hosted AI assistant that connects to messaging platforms. Chat with Claude via WhatsApp, Telegram, Discord, Slack, Signal, iMessage.\n\nWhen to use:\n- You want to chat with AI from messaging apps instead of opening a website\n- You want voice interaction with AI\n- You want browser automation from your phone\n- You want persistent context across conversations\n- You want AI in group chats with friends\n\nRequires:\n- A laptop/server that stays on (runs the Gateway)\n- Tailscale or similar for remote access\n- Claude or OpenAI API key\n\nComponents: Gateway (routes messages) + Agent (talks to AI API)","type":"tool","category":"toolbox","subcategory":"ai-agents","size":18},{"id":"public/concepts/computing/https-beyond-browsers","name":"https-beyond-browsers","fullName":"public/concepts/computing/https-beyond-browsers","description":"HTTPS is used for more than just websites","content":"HTTPS IS NOT JUST FOR WEBSITES\n\nHTTPS (port 443) is a general protocol for sending/receiving data securely. Used by:\n\n- Browsers fetching websites (what most people know)\n- Apps fetching data (Instagram loading your feed)\n- Package managers downloading packages (npm, bun)\n- Chat apps sending messages (Slack, Discord)\n- APIs communicating (any app talking to a server)\n\nWhen bun connects to registry.npmjs.org:443, its the same protocol your browser uses for amazon.com:443. Same encryption, same port. Just different data being transferred.\n\nHTTPS = the universal language of the internet. Almost everything uses it.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/bundlers","name":"bundlers","fullName":"public/concepts/computing/bundlers","description":"What bundlers (webpack) do - combine files for production","content":"BUNDLERS (Webpack, etc.)\n\nProblem: Your project has 50 JavaScript files, 20 CSS files. Loading 70 files = slow.\n\nSolution: Bundler combines them into fewer, optimized files.\n\nBefore (development):\nsrc/\n  components/Header.js, Footer.js, Button.js\n  utils/helpers.js\n  styles/main.css, buttons.css\n\nAfter (production):\ndist/\n  bundle.js (all JS combined)\n  styles.css (all CSS combined)\n\n50 files -> 2 files = faster page load\n\nBundlers also:\n- Minify code (remove whitespace, shorten names)\n- Transform modern JS to work in old browsers\n- Optimize images\n\nWebpack = most common, complex\nBun = has built-in bundler, simpler","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/nodejs-runtime","name":"nodejs-runtime","fullName":"public/concepts/computing/nodejs-runtime","description":"What Node.js is - a runtime that executes JavaScript","content":"NODE.JS - JavaScript Runtime\n\nA RUNTIME is the thing that actually executes code.\n\nHistory:\n- JavaScript was invented for browsers\n- 2009: Node.js created to run JavaScript OUTSIDE browsers\n- Now you can run JavaScript on servers, laptops, anywhere\n\nBrowser JavaScript vs Node.js:\n\nBROWSER:\n- Runs inside web page\n- Can manipulate webpage\n- Cannot read your files\n\nNODE.JS:\n- Runs on computer directly\n- Can read/write files\n- Can run servers\n- Cannot manipulate webpages (no browser)\n\nWhen you run \"node app.js\" or \"bun app.js\", the runtime reads your code and executes it.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/thin-vs-thick-client","name":"thin-vs-thick-client","fullName":"public/concepts/computing/thin-vs-thick-client","description":"Difference between thin clients (mostly UI) and thick clients (local processing)","content":"THIN CLIENT VS THICK CLIENT\n\nTHIN CLIENT (dumb client):\n- Mostly UI, real work happens on server\n- Without internet: useless\n- Examples: Facebook app, Instagram, Banking app, Uber\n- The app just displays what server sends and forwards your input back\n\nTHICK CLIENT (local program):\n- Does real work locally on your device\n- Without internet: still works (mostly)\n- Examples: Photoshop, VS Code, Calculator, VLC, Bun\n- May connect to internet for some features, but core functionality is local\n\nIts a spectrum, not binary:\nCalculator (100% local) <-> Banking app (100% server)\n\nHow to tell: Ask \"what happens if I turn off internet?\"\n- Useless = thin client\n- Still works = thick client\n\nTerms mean the same: app, program, application. The thin/thick distinction is about WHERE the work happens.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/package-managers","name":"package-managers","fullName":"public/concepts/computing/package-managers","description":"What package managers (npm, bun) are and why they exist","content":"PACKAGE MANAGERS (npm, bun, etc.)\n\nProblem they solve:\nYou don't want to build everything from scratch. Someone already wrote code for HTTP requests, date handling, etc. Package managers let you download and use other people's code automatically.\n\nWithout package manager:\n1. Find library on internet\n2. Download zip\n3. Figure out its dependencies\n4. Download those too\n5. Repeat forever\n\nWith package manager:\n1. Type: npm install axios\n2. Done\n\nKey files:\n- package.json: Shopping list of packages you need\n- package-lock.json / bun.lockb: Exact versions installed\n- node_modules/: Folder containing all downloaded code\n\nBoth npm and bun download from the SAME registry (registry.npmjs.org). Bun is just a faster client.\n\n---\n\nWHY BUN IS FASTER THAN NPM\n\n1. Language: Zig vs JavaScript\n   - npm runs on Node.js (JavaScript interpreted by V8)\n   - Bun is written in Zig, compiles to native machine code\n   - No interpreter overhead, CPU runs it directly\n\n2. Integrated vs Modular\n   - npm is JUST a package manager (node, npx, webpack are separate processes)\n   - Bun is all-in-one: runtime + package manager + bundler + test runner\n   - No overhead spawning separate processes, everything shares memory\n\n3. Parallelization\n   - npm: more sequential (conservative, designed for older machines)\n   - Bun: downloads, extracts, and links in parallel (assumes modern multi-core CPUs)\n\n4. Global Cache with Hardlinks\n   - npm: traditionally copied packages per project (newer versions improved)\n   - Bun: downloads once to global cache, uses hardlinks\n   - 10 projects using React = 1 copy on disk, not 10\n\n5. Native HTTP\n   - npm: Node.js HTTP libraries (JavaScript)\n   - Bun: native HTTP client in Zig, optimized for package downloads","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/toolbox/devtools/bun","name":"bun","fullName":"public/toolbox/devtools/bun","description":"Fast JavaScript runtime and package manager - used for Clawdbot","content":"BUN\n\nCategory: DevTools / JavaScript Runtime + Package Manager\nWebsite: https://bun.sh\nCost: Free and open source\n\nWhat it does:\nAll-in-one JavaScript toolkit. Replaces three separate tools:\n- npm (package manager) --> bun install\n- node (runtime) --> bun run app.js\n- webpack (bundler) --> bun build\n\nWhy its faster than npm:\n- Written in Zig (low-level, fast) vs npm in JavaScript\n- Downloads packages in parallel vs one at a time\n- Aggressive caching\n\nWhen I used it:\nInstalling Clawdbot. \"bun install\" took ~19 seconds for 2,228 packages. With npm this would have been 1-2 minutes.\n\nInstall: curl -fsSL https://bun.sh/install | bash\nAfter install: ~/.bun/bin/bun or add to PATH\n\nTip: Use whatever the project specifies. See package-lock.json? Use npm. See bun.lockb? Use bun.","type":"tool","category":"toolbox","subcategory":"devtools","size":18},{"id":"public/toolbox/knowledge/ensue","name":"ensue","fullName":"public/toolbox/knowledge/ensue","description":"Persistent knowledge base for augmented cognition across conversations","content":"ENSUE\n\nCategory: Knowledge Management / Memory\nWebsite: https://www.ensue-network.ai\nCost: Free tier available\n\nWhat it does:\nPersistent knowledge base that works across AI conversations. Store concepts, notes, and learnings that Claude can retrieve in future sessions. Your knowledge compounds over time instead of resetting every conversation.\n\nWhen to use:\n- Building a personal knowledge base of concepts you learn\n- Storing information you want to recall in future conversations\n- Creating a toolbox of software and tools you have used\n- Remembering decisions, preferences, and learnings\n\nHow I use it:\n- public/concepts/ namespace for computing and networking fundamentals\n- public/toolbox/ namespace for software I have actually used\n- Each entry has description, full explanation, and examples\n\nKey insight: Not just storage - its augmented cognition. Future conversations can build on what you already know instead of starting from zero.\n\nIntegrates with: Claude Code via plugin/skill","type":"tool","category":"toolbox","subcategory":"knowledge","size":18},{"id":"public/concepts/computing/npm-registry","name":"npm-registry","fullName":"public/concepts/computing/npm-registry","description":"What the npm registry is and who maintains it","content":"NPM REGISTRY\n\nWhat: Giant server storing 2+ million JavaScript packages\nURL: registry.npmjs.org\nOwned by: npm Inc (owned by GitHub, owned by Microsoft)\n\nCost:\n- Download packages: FREE (always)\n- Publish public packages: FREE\n- Private packages: Paid tiers for companies\n\nBusiness model: Like YouTube - free to use, company makes money from enterprise customers.\n\nBoth npm and bun download from the SAME registry. Bun is not a separate server. Its just a faster client that talks to the same npm registry.\n\nWhen you publish a package, you upload to npm registry. Anyone can then install it with npm OR bun.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/disk-vs-ram","name":"disk-vs-ram","fullName":"public/concepts/computing/disk-vs-ram","description":"Difference between disk storage and RAM memory","content":"DISK VS RAM\n\nRAM (memory):\n- Fast, temporary\n- Lost when laptop restarts or loses power\n- Running programs live here\n- Limited size (8GB, 16GB, 32GB typical)\n\nDISK (storage - SSD/hard drive):\n- Slower than RAM, but permanent\n- Survives restarts\n- Files, photos, apps, caches live here\n- Large size (256GB, 512GB, 1TB typical)\n\nExample - Bun cache:\n- Cache is stored on DISK (~/.bun/install/cache/)\n- Survives restarts\n- Install axios today, restart 100 times, cache still there\n- Next project needing axios = instant, no re-download\n\nWhen people say \"clear your cache\" they mean delete cached files from disk. When they say \"restart to clear memory\" they mean RAM.","type":"concept","category":"concepts","subcategory":"computing","size":18},{"id":"public/concepts/computing/visual-bun-install-process","name":"visual-bun-install-process","fullName":"public/concepts/computing/visual-bun-install-process","description":"Visual diagram of what happens when you run bun install","content":"VISUAL: WHAT HAPPENS WHEN YOU RUN BUN INSTALL\n==============================================\n\nYOU\n |\n | type \"bun install\"\n v\n+-------------------------------------------------------------+\n|                     YOUR LAPTOP                             |\n|                                                             |\n|   Terminal --> Bun program starts                           |\n|                    |                                        |\n|                    v                                        |\n|              +----------+     +-------------------------+   |\n|              |   Bun    |---->|  ~/.bun/install/cache/  |   |\n|              |          |     |  (check local cache)    |   |\n|              |          |     +-------------------------+   |\n|              |          |                                   |\n|              +----+-----+                                   |\n|                   |                                         |\n+-------------------|-----------------------------------------+\n                    |\n                    | HTTPS requests (only if not cached)\n                    v\n          +---------------------+\n          |    NPM REGISTRY     |\n          | (registry.npmjs.org)|\n          |    port 443         |\n          +---------------------+\n\nSteps:\n1. Bun reads package.json (what packages needed)\n2. Checks local cache (already downloaded before?)\n3. If not cached: downloads from npm registry via HTTPS\n4. Extracts to node_modules/ folder\n5. Saves to cache for next time\n6. Creates lockfile with exact versions\n\nSecond install of same package = instant (from cache, no network).","type":"diagram","category":"concepts","subcategory":"computing","size":18}],"links":[{"source":"concepts","target":"concepts/computing","type":"hierarchy"},{"source":"toolbox","target":"toolbox/devtools","type":"hierarchy"},{"source":"concepts","target":"concepts/networking","type":"hierarchy"},{"source":"toolbox","target":"toolbox/networking","type":"hierarchy"},{"source":"toolbox","target":"toolbox/ai-agents","type":"hierarchy"},{"source":"toolbox","target":"toolbox/knowledge","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/shell-compatibility-in-docs","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/shell-scripts","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/terminal-vs-shell","type":"hierarchy"},{"source":"toolbox/devtools","target":"public/toolbox/devtools/ghostty","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/tls-vs-e2ee","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/e2ee-trust-model","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/legacy-vs-greenfield","type":"hierarchy"},{"source":"concepts/networking","target":"public/concepts/networking/gateway","type":"hierarchy"},{"source":"concepts/networking","target":"public/concepts/networking/ports","type":"hierarchy"},{"source":"concepts/networking","target":"public/concepts/networking/private-ip-problem","type":"hierarchy"},{"source":"concepts/networking","target":"public/concepts/networking/vpn","type":"hierarchy"},{"source":"concepts/networking","target":"public/concepts/networking/laptop-must-stay-on","type":"hierarchy"},{"source":"concepts/networking","target":"public/concepts/networking/multiple-agents-multiple-ports","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/common-services-overview","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/client-server-architecture","type":"hierarchy"},{"source":"concepts/networking","target":"public/concepts/networking/visual-ports-analogy","type":"hierarchy"},{"source":"concepts/networking","target":"public/concepts/networking/visual-gateway-pattern","type":"hierarchy"},{"source":"concepts/networking","target":"public/concepts/networking/visual-architecture-diagram","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/ports-listening-vs-connecting","type":"hierarchy"},{"source":"concepts/networking","target":"public/concepts/networking/self-hosted-agent-architecture","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/what-is-a-server","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/why-remote-storage","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/databases-explained","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/how-browsers-find-websites","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/visual-client-server-diagram","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/ssh-explained","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/redis-explained","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/dev-server-explained","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/mental-model-summary","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/what-is-streaming","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/rendering-gpu-vs-cpu","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/visual-ports-listening","type":"hierarchy"},{"source":"toolbox/networking","target":"public/toolbox/networking/tailscale","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/frontend-vs-backend","type":"hierarchy"},{"source":"toolbox/ai-agents","target":"public/toolbox/ai-agents/claude-code","type":"hierarchy"},{"source":"toolbox/ai-agents","target":"public/toolbox/ai-agents/clawdbot","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/https-beyond-browsers","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/bundlers","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/nodejs-runtime","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/thin-vs-thick-client","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/package-managers","type":"hierarchy"},{"source":"toolbox/devtools","target":"public/toolbox/devtools/bun","type":"hierarchy"},{"source":"toolbox/knowledge","target":"public/toolbox/knowledge/ensue","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/npm-registry","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/disk-vs-ram","type":"hierarchy"},{"source":"concepts/computing","target":"public/concepts/computing/visual-bun-install-process","type":"hierarchy"},{"source":"public/concepts/computing/shell-compatibility-in-docs","target":"public/concepts/computing/shell-scripts","type":"related"},{"source":"public/concepts/computing/shell-scripts","target":"public/concepts/computing/ssh-explained","type":"related"},{"source":"public/concepts/computing/shell-scripts","target":"public/concepts/computing/visual-bun-install-process","type":"related"},{"source":"public/concepts/computing/terminal-vs-shell","target":"public/concepts/computing/tls-vs-e2ee","type":"related"},{"source":"public/concepts/computing/terminal-vs-shell","target":"public/concepts/computing/thin-vs-thick-client","type":"related"},{"source":"public/concepts/computing/terminal-vs-shell","target":"public/concepts/computing/disk-vs-ram","type":"related"},{"source":"public/concepts/computing/tls-vs-e2ee","target":"public/concepts/computing/thin-vs-thick-client","type":"related"},{"source":"public/concepts/computing/tls-vs-e2ee","target":"public/concepts/computing/disk-vs-ram","type":"related"},{"source":"public/concepts/computing/legacy-vs-greenfield","target":"public/concepts/computing/https-beyond-browsers","type":"related"},{"source":"public/concepts/networking/gateway","target":"public/concepts/networking/visual-gateway-pattern","type":"related"},{"source":"public/concepts/networking/ports","target":"public/concepts/networking/vpn","type":"related"},{"source":"public/concepts/networking/ports","target":"public/concepts/computing/package-managers","type":"related"},{"source":"public/concepts/networking/laptop-must-stay-on","target":"public/concepts/networking/visual-architecture-diagram","type":"related"},{"source":"public/concepts/networking/laptop-must-stay-on","target":"public/concepts/networking/self-hosted-agent-architecture","type":"related"},{"source":"public/concepts/networking/laptop-must-stay-on","target":"public/toolbox/ai-agents/clawdbot","type":"related"},{"source":"public/concepts/networking/multiple-agents-multiple-ports","target":"public/concepts/computing/common-services-overview","type":"related"},{"source":"public/concepts/computing/client-server-architecture","target":"public/concepts/computing/ports-listening-vs-connecting","type":"related"},{"source":"public/concepts/computing/client-server-architecture","target":"public/concepts/computing/how-browsers-find-websites","type":"related"},{"source":"public/concepts/computing/client-server-architecture","target":"public/concepts/computing/visual-client-server-diagram","type":"related"},{"source":"public/concepts/computing/client-server-architecture","target":"public/concepts/computing/mental-model-summary","type":"related"},{"source":"public/concepts/computing/client-server-architecture","target":"public/concepts/computing/https-beyond-browsers","type":"related"},{"source":"public/concepts/computing/client-server-architecture","target":"public/concepts/computing/thin-vs-thick-client","type":"related"},{"source":"public/concepts/networking/visual-ports-analogy","target":"public/concepts/computing/visual-ports-listening","type":"related"},{"source":"public/concepts/networking/visual-gateway-pattern","target":"public/concepts/networking/visual-architecture-diagram","type":"related"},{"source":"public/concepts/networking/visual-gateway-pattern","target":"public/concepts/computing/visual-client-server-diagram","type":"related"},{"source":"public/concepts/networking/visual-gateway-pattern","target":"public/concepts/computing/visual-ports-listening","type":"related"},{"source":"public/concepts/networking/visual-gateway-pattern","target":"public/concepts/computing/visual-bun-install-process","type":"related"},{"source":"public/concepts/networking/visual-architecture-diagram","target":"public/concepts/networking/self-hosted-agent-architecture","type":"related"},{"source":"public/concepts/networking/visual-architecture-diagram","target":"public/concepts/computing/visual-client-server-diagram","type":"related"},{"source":"public/concepts/networking/visual-architecture-diagram","target":"public/concepts/computing/visual-ports-listening","type":"related"},{"source":"public/concepts/networking/visual-architecture-diagram","target":"public/toolbox/ai-agents/clawdbot","type":"related"},{"source":"public/concepts/networking/visual-architecture-diagram","target":"public/concepts/computing/visual-bun-install-process","type":"related"},{"source":"public/concepts/computing/ports-listening-vs-connecting","target":"public/concepts/computing/how-browsers-find-websites","type":"related"},{"source":"public/concepts/computing/ports-listening-vs-connecting","target":"public/concepts/computing/visual-client-server-diagram","type":"related"},{"source":"public/concepts/computing/ports-listening-vs-connecting","target":"public/concepts/computing/visual-ports-listening","type":"related"},{"source":"public/concepts/networking/self-hosted-agent-architecture","target":"public/toolbox/ai-agents/clawdbot","type":"related"},{"source":"public/concepts/computing/what-is-a-server","target":"public/concepts/computing/redis-explained","type":"related"},{"source":"public/concepts/computing/what-is-a-server","target":"public/concepts/computing/dev-server-explained","type":"related"},{"source":"public/concepts/computing/databases-explained","target":"public/concepts/computing/ssh-explained","type":"related"},{"source":"public/concepts/computing/databases-explained","target":"public/concepts/computing/redis-explained","type":"related"},{"source":"public/concepts/computing/databases-explained","target":"public/concepts/computing/dev-server-explained","type":"related"},{"source":"public/concepts/computing/databases-explained","target":"public/concepts/computing/what-is-streaming","type":"related"},{"source":"public/concepts/computing/how-browsers-find-websites","target":"public/concepts/computing/https-beyond-browsers","type":"related"},{"source":"public/concepts/computing/visual-client-server-diagram","target":"public/concepts/computing/mental-model-summary","type":"related"},{"source":"public/concepts/computing/visual-client-server-diagram","target":"public/concepts/computing/visual-ports-listening","type":"related"},{"source":"public/concepts/computing/visual-client-server-diagram","target":"public/concepts/computing/thin-vs-thick-client","type":"related"},{"source":"public/concepts/computing/visual-client-server-diagram","target":"public/concepts/computing/visual-bun-install-process","type":"related"},{"source":"public/concepts/computing/ssh-explained","target":"public/concepts/computing/redis-explained","type":"related"},{"source":"public/concepts/computing/ssh-explained","target":"public/concepts/computing/dev-server-explained","type":"related"},{"source":"public/concepts/computing/ssh-explained","target":"public/concepts/computing/visual-bun-install-process","type":"related"},{"source":"public/concepts/computing/redis-explained","target":"public/concepts/computing/dev-server-explained","type":"related"},{"source":"public/concepts/computing/visual-ports-listening","target":"public/concepts/computing/visual-bun-install-process","type":"related"},{"source":"public/concepts/computing/nodejs-runtime","target":"public/toolbox/devtools/bun","type":"related"},{"source":"public/concepts/computing/thin-vs-thick-client","target":"public/concepts/computing/disk-vs-ram","type":"related"}]};
+
+        let currentView = 'tree';
+        let graphInitialized = false;
+        let showLabels = true;
+        let simulation, svg, g, zoom, node, link, labels;
+
+        const icons = { concept: "📄", tool: "🔧", diagram: "📊" };
+
+        // View switching
+        function switchView(view) {
+            currentView = view;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.tab[onclick*="' + view + '"]').classList.add('active');
+
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(view + '-view').classList.add('active');
+
+            document.getElementById('tree-controls').style.display = view === 'tree' ? 'flex' : 'none';
+            document.getElementById('graph-controls').style.display = view === 'graph' ? 'flex' : 'none';
+
+            if (view === 'graph' && !graphInitialized) {
+                initGraph();
+                graphInitialized = true;
+            }
+
+            document.getElementById('search').value = '';
+        }
+
+        // Modal
+        function showModal(data) {
+            document.getElementById('modal-icon').className = 'node-icon ' + data.type;
+            document.getElementById('modal-icon').textContent = icons[data.type] || '📄';
+            document.getElementById('modal-name').textContent = data.name;
+            document.getElementById('modal-path').textContent = data.key || data.fullName || '';
+            document.getElementById('modal-description').textContent = data.description || '';
+            document.getElementById('modal-description').style.display = data.description ? 'block' : 'none';
+            document.getElementById('modal-text').textContent = data.content || 'No content available';
+            document.getElementById('modal').classList.add('visible');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('modal').classList.remove('visible');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+        // Tree functions
+        function countChildren(node) {
+            if (!node.children) return 0;
+            return node.children.reduce((sum, child) => sum + 1 + countChildren(child), 0);
+        }
+
+        function createNode(node, level = 0) {
+            const div = document.createElement('div');
+            div.className = 'branch level-' + level;
+            div.dataset.name = node.name.toLowerCase();
+
+            const hasChildren = node.children && node.children.length > 0;
+            const isLeaf = !hasChildren;
+
+            const row = document.createElement('div');
+            row.className = 'node-row' + (isLeaf ? ' leaf' : '');
+
+            const toggle = document.createElement('div');
+            toggle.className = 'toggle expanded';
+            toggle.innerHTML = '▶';
+            if (hasChildren) {
+                toggle.onclick = (e) => {
+                    e.stopPropagation();
+                    const children = div.querySelector('.children');
+                    if (children) {
+                        children.classList.toggle('hidden');
+                        toggle.classList.toggle('expanded');
+                    }
+                };
+            }
+            row.appendChild(toggle);
+
+            const iconDiv = document.createElement('div');
+            iconDiv.className = 'node-icon ' + node.type;
+            iconDiv.textContent = node.icon || icons[node.type] || '📄';
+            row.appendChild(iconDiv);
+
+            const label = document.createElement('span');
+            label.className = 'node-label';
+            label.textContent = node.name;
+            row.appendChild(label);
+
+            if (node.description && isLeaf) {
+                const desc = document.createElement('span');
+                desc.className = 'node-description';
+                desc.textContent = '— ' + node.description;
+                row.appendChild(desc);
+            }
+
+            if (hasChildren) {
+                const count = document.createElement('span');
+                count.className = 'node-count';
+                count.textContent = countChildren(node) + ' items';
+                row.appendChild(count);
+            }
+
+            if (isLeaf && node.content) {
+                row.onclick = () => showModal(node);
+            }
+
+            div.appendChild(row);
+
+            if (hasChildren) {
+                const childrenDiv = document.createElement('div');
+                childrenDiv.className = 'children';
+                node.children.forEach(child => childrenDiv.appendChild(createNode(child, level + 1)));
+                div.appendChild(childrenDiv);
+            }
+
+            return div;
+        }
+
+        function renderTree() {
+            const container = document.getElementById('tree-view');
+            container.innerHTML = '';
+            container.appendChild(createNode(treeData));
+        }
+
+        function expandAll() {
+            document.querySelectorAll('.children').forEach(el => el.classList.remove('hidden'));
+            document.querySelectorAll('.toggle').forEach(el => el.classList.add('expanded'));
+        }
+
+        function collapseAll() {
+            document.querySelectorAll('.level-2 .children, .level-3 .children').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.level-2 .toggle, .level-3 .toggle').forEach(el => el.classList.remove('expanded'));
+        }
+
+        function searchTree(query) {
+            const q = query.toLowerCase().trim();
+            document.querySelectorAll('.branch').forEach(branch => {
+                const name = branch.dataset.name;
+                if (!q) {
+                    branch.classList.remove('hidden');
+                    branch.querySelector('.node-label').innerHTML = branch.querySelector('.node-label').textContent;
+                } else if (name.includes(q)) {
+                    branch.classList.remove('hidden');
+                    const label = branch.querySelector('.node-label');
+                    const text = label.textContent;
+                    const idx = text.toLowerCase().indexOf(q);
+                    if (idx >= 0) {
+                        label.innerHTML = text.slice(0, idx) + '<span class="highlight">' + text.slice(idx, idx + q.length) + '</span>' + text.slice(idx + q.length);
+                    }
+                    let parent = branch.parentElement;
+                    while (parent) {
+                        if (parent.classList.contains('branch')) parent.classList.remove('hidden');
+                        if (parent.classList.contains('children')) parent.classList.remove('hidden');
+                        parent = parent.parentElement;
+                    }
+                } else {
+                    branch.classList.add('hidden');
+                }
+            });
+            if (q) expandAll();
+        }
+
+        // Graph functions
+        const colors = {
+            category: { concepts: { main: '#818cf8', glow: 'rgba(129, 140, 248, 0.6)' }, toolbox: { main: '#c084fc', glow: 'rgba(192, 132, 252, 0.6)' } },
+            subcategory: { computing: { main: '#34d399' }, networking: { main: '#22d3ee' }, 'ai-agents': { main: '#f472b6' }, devtools: { main: '#60a5fa' }, knowledge: { main: '#a78bfa' }, security: { main: '#fb7185' } },
+            types: { concept: { main: '#34d399', glow: 'rgba(52, 211, 153, 0.4)' }, tool: { main: '#fbbf24', glow: 'rgba(251, 191, 36, 0.4)' }, diagram: { main: '#f472b6', glow: 'rgba(244, 114, 182, 0.4)' } }
+        };
+
+        function getNodeColor(n) {
+            if (n.type === 'category') return colors.category[n.name] || { main: '#818cf8', glow: 'rgba(129, 140, 248, 0.5)' };
+            if (n.type === 'subcategory') return colors.subcategory[n.name] || { main: '#60a5fa', glow: 'rgba(96, 165, 250, 0.5)' };
+            return colors.types[n.type] || colors.types.concept;
+        }
+
+        function initGraph() {
+            const container = document.getElementById('graph-view');
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            svg = d3.select('#graph-view').append('svg').attr('width', width).attr('height', height);
+
+            const defs = svg.append('defs');
+            const filter = defs.append('filter').attr('id', 'glow').attr('x', '-50%').attr('y', '-50%').attr('width', '200%').attr('height', '200%');
+            filter.append('feGaussianBlur').attr('stdDeviation', '3').attr('result', 'coloredBlur');
+            const feMerge = filter.append('feMerge');
+            feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+            feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+            const filterHover = defs.append('filter').attr('id', 'glow-hover').attr('x', '-100%').attr('y', '-100%').attr('width', '300%').attr('height', '300%');
+            filterHover.append('feGaussianBlur').attr('stdDeviation', '8').attr('result', 'coloredBlur');
+            const feMergeHover = filterHover.append('feMerge');
+            feMergeHover.append('feMergeNode').attr('in', 'coloredBlur');
+            feMergeHover.append('feMergeNode').attr('in', 'SourceGraphic');
+
+            g = svg.append('g');
+
+            zoom = d3.zoom().scaleExtent([0.2, 4]).on('zoom', (event) => g.attr('transform', event.transform));
+            svg.call(zoom);
+            svg.call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2).scale(0.75));
+
+            simulation = d3.forceSimulation(graphData.nodes)
+                .force('link', d3.forceLink(graphData.links).id(d => d.id).distance(d => d.type === 'related' ? 180 : 100).strength(d => d.type === 'related' ? 0.05 : 0.4))
+                .force('charge', d3.forceManyBody().strength(d => d.type === 'category' ? -600 : d.type === 'subcategory' ? -300 : -150))
+                .force('center', d3.forceCenter(0, 0))
+                .force('collision', d3.forceCollide().radius(d => d.size + 35));
+
+            link = g.append('g').selectAll('line').data(graphData.links).join('line')
+                .attr('class', 'link')
+                .attr('stroke', d => d.type === 'related' ? 'rgba(129, 140, 248, 0.08)' : 'rgba(255, 255, 255, 0.1)')
+                .attr('stroke-width', d => d.type === 'related' ? 1 : 1.5);
+
+            node = g.append('g').selectAll('g').data(graphData.nodes).join('g').attr('class', 'node')
+                .call(d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended));
+
+            node.append('circle').attr('r', d => d.size + 4).attr('fill', d => getNodeColor(d).glow || 'rgba(129, 140, 248, 0.3)').attr('opacity', 0.3).style('filter', 'blur(8px)');
+
+            node.append('circle').attr('r', d => d.size).attr('fill', d => getNodeColor(d).main)
+                .attr('stroke', 'rgba(255, 255, 255, 0.2)').attr('stroke-width', 1.5)
+                .style('cursor', 'pointer').style('filter', 'url(#glow)')
+                .on('mouseover', function(event, d) {
+                    d3.select(this).transition().duration(200).attr('r', d.size * 1.15).style('filter', 'url(#glow-hover)');
+                    showTooltip(event, d);
+                })
+                .on('mouseout', function(event, d) {
+                    d3.select(this).transition().duration(200).attr('r', d.size).style('filter', 'url(#glow)');
+                    hideTooltip();
+                })
+                .on('click', handleNodeClick);
+
+            labels = node.append('text').attr('class', d => 'graph-label ' + d.type).attr('dy', d => d.size + 16).attr('text-anchor', 'middle')
+                .text(d => d.name.length > 22 ? d.name.substring(0, 20) + '...' : d.name);
+
+            simulation.on('tick', () => {
+                link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+                node.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+            });
+        }
+
+        function dragstarted(event) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            event.subject.fx = event.subject.x;
+            event.subject.fy = event.subject.y;
+        }
+
+        function dragged(event) {
+            event.subject.fx = event.x;
+            event.subject.fy = event.y;
+        }
+
+        function dragended(event) {
+            if (!event.active) simulation.alphaTarget(0);
+            event.subject.fx = null;
+            event.subject.fy = null;
+        }
+
+        function showTooltip(event, d) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.innerHTML = '<h3>' + d.name + '</h3><div class="type-badge">' + d.type + '</div>' + (d.description ? '<p>' + d.description + '</p>' : '');
+            tooltip.style.left = (event.pageX + 20) + 'px';
+            tooltip.style.top = (event.pageY - 10) + 'px';
+            tooltip.classList.add('visible');
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').classList.remove('visible');
+        }
+
+        function handleNodeClick(event, d) {
+            if (d.content && (d.type === 'concept' || d.type === 'tool' || d.type === 'diagram')) {
+                showModal(d);
+            } else {
+                const width = window.innerWidth;
+                const height = window.innerHeight;
+                const scale = 1.8;
+                svg.transition().duration(600).ease(d3.easeCubicInOut)
+                    .call(zoom.transform, d3.zoomIdentity.translate(width / 2 - d.x * scale, height / 2 - d.y * scale).scale(scale));
+            }
+        }
+
+        function resetGraphView() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            svg.transition().duration(600).ease(d3.easeCubicInOut)
+                .call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2).scale(0.75));
+        }
+
+        function toggleLabels() {
+            showLabels = !showLabels;
+            labels.transition().duration(300).style('opacity', showLabels ? 1 : 0);
+        }
+
+        function searchGraph(query) {
+            const q = query.toLowerCase().trim();
+            node.selectAll('circle').transition().duration(300).attr('opacity', d => {
+                if (!q) return 1;
+                const match = d.name.toLowerCase().includes(q) || (d.description && d.description.toLowerCase().includes(q));
+                return match ? 1 : 0.1;
+            });
+            labels.transition().duration(300).attr('opacity', d => {
+                if (!showLabels) return 0;
+                if (!q) return 1;
+                const match = d.name.toLowerCase().includes(q) || (d.description && d.description.toLowerCase().includes(q));
+                return match ? 1 : 0.1;
+            });
+        }
+
+        function handleSearch(query) {
+            if (currentView === 'tree') {
+                searchTree(query);
+            } else {
+                searchGraph(query);
+            }
+        }
+
+        // Initialize
+        renderTree();
+
+        window.addEventListener('resize', () => {
+            if (svg) svg.attr('width', window.innerWidth).attr('height', window.innerHeight);
+        });
+    </script>
+</body>
+</html>
