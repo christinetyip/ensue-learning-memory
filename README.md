@@ -2,6 +2,8 @@
 
 A learning-focused knowledge base plugin for Claude Code, built on [Ensue Memory Network](https://ensue.dev).
 
+![Knowledge Base Demo](demo.gif)
+
 ## Who This Is For
 
 Non-technical builders (vibecoding, no-code, learning to code) who want to:
@@ -166,23 +168,25 @@ Analogy: A restaurant kitchen. It waits for orders (requests) and
 serves food (responses).
 ```
 
-## Knowledge Tree Visualization
+## Knowledge Visualization
 
 Generate an interactive HTML visualization of your knowledge base:
 
 ```bash
 # Make sure ENSUE_API_KEY is set, then run:
-bun run scripts/generate-tree.js
+bun run scripts/generate-knowledge-view.js
 
-# Opens knowledge-base.html in your browser
-open knowledge-base.html
+# Opens knowledge-view.html in your browser
+open knowledge-view.html
 ```
 
 Features:
-- Interactive tree view of all your concepts and tools
-- Search/filter functionality
-- Collapsible branches
-- Color-coded by type (concept, tool, diagram)
+- **Two views in one**: Toggle between Tree and Graph views
+- **Tree view**: Hierarchical view with expandable branches
+- **Graph view**: Force-directed network showing connections between concepts
+- **Click to view**: Click any entry to see its full content
+- **Search**: Filter nodes in both views
+- **Modern UI**: Glassmorphism design with glowing nodes
 
 Run this whenever you want to update your visualization after adding new knowledge.
 
